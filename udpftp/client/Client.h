@@ -21,7 +21,9 @@ class Client {
 	public:
 		Client();
 		int getFile(char * filename);
-		void Client::displayList();
+		void displayList();
+		void showLocalList();
+		int sendFile(char * filenamae);
 	private:
 		char message[BUFLEN];
 		struct sockaddr_in si_other;

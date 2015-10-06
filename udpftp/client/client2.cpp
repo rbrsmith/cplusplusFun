@@ -18,7 +18,7 @@ int main(void)
 
 
 	Client client;
-	cout << "1 - list\n2 - Get";
+	cout << "1 - Remote List\n2 - Get\n3-Local List\n4 - Put";
 	int choice;
 	cin >> choice;
 	cin.get();
@@ -38,6 +38,18 @@ int main(void)
 		else {
 			cout << "Error";
 		}
+	}
+	else if (choice == 3) {
+		cout << "LOCAL LIST";
+		client.showLocalList();
+	}
+	else if (choice == 4) {
+		cout << "PUT";
+		cout << "Enter file name: ";
+		char filename[200];
+		gets_s(filename);
+		cout << filename;
+		client.sendFile(filename);
 	}
 
 }

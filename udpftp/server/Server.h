@@ -30,4 +30,6 @@ class Server {
 		int sendFile(string file);
 		int sendList();
 		string getFiles();
+		int receiveFile();
+		int appendToFile(char * buffer, int headerBits, string filename);
 };

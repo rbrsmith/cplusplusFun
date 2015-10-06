@@ -2,6 +2,7 @@
 #include "stdafx.h";
 
 #include "Client.h";
+#include "dirent\dirent.h"
 
 Client::Client() {
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
@@ -80,7 +81,6 @@ void Client::displayList() {
 	puts(buf);
 
 
-//	string output = "";
 	int count = 0;
 	while (1) {
 		count += 1;
@@ -93,8 +93,6 @@ void Client::displayList() {
 
 		puts(buf);
 
-//		string file(filename);
-//		appendToFile(buf, 1, file);
 		if (buf[0] - '0' == 1) {
 			break;
 		}
@@ -115,7 +113,7 @@ int Client::appendToFile(char * buffer, int headerBits, string filename) {
 	{
 		for (int i = headerBits; i != BUFLEN; i++)
 		{
-			fout << buffer[i]; //appending ith character of array in the file
+			fout << buffer[i];
 		}
 		return 0;
 	}
@@ -144,4 +142,118 @@ int Client::binToDec(int * bin, int size) {
 		}
 	}
 	return val;
+}
+
+void Client::showLocalList() {
+	string output = "";
+	DIR *dir;
+	struct dirent *ent;
+	if ((dir = opendir(".")) != NULL) {
+		/* print all the files and directories within directory */
+		while ((ent = readdir(dir)) != NULL) {
+			string fname = ent->d_name;
+			if (fname.compare("..") == 0 || fname.compare(".") == 0) {
+				continue;
+			}
+			output += ent->d_name;
+			output += "\n";
+		}
+		cout << output;
+		closedir(dir);
+	}
+	else {
+		/* could not open directory */
+		perror("");
+		exit(EXIT_FAILURE);
+	}
+}
+
+
+int Client::sendFile(char * filename) {
+	string file(filename);
+
+	ifstream fileToRead;
+	fileToRead.open(file, ios::in | ios::binary);
+	if (fileToRead.is_open())
+	{
+		// Can make this a bit better
+		// Count how many packets there will be
+		char fakeBuf[BUFLEN - 1];
+		int numPackets = 0;
+		while (!fileToRead.eof()) {
+			memset(fakeBuf, '\0', BUFLEN - 1);
+			numPackets += 1;
+			fileToRead.read(buf, BUFLEN - 1);
+		}
+
+		fileToRead.clear();
+		fileToRead.seekg(0, ios::beg);
+		int packetCount = 1;
+
+		// SEND FIRST REQ
+		/* Transfer the content to requested client */
+		buf[0] = '2';
+		if (sendto(s, buf, BUFLEN, 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
+		{
+			printf("sendto() failed with error code : %d", WSAGetLastError());
+			/* Close the connection and unlock the mutex if there is a Socket Error */
+			closesocket(s);
+
+			return -1;
+		}
+		else
+		{
+			/* Reset the buffer and use the buffer for next transmission */
+			memset(buf, '\0', sizeof(buf));
+		}
+		// END SEND
+
+
+		char newbuf[BUFLEN - 1];
+		while (!fileToRead.eof())
+		{
+			memset(newbuf, '\0', BUFLEN - 1);
+			/* Read the contents of file and write into the buffer for transmission */
+			fileToRead.read(newbuf, BUFLEN-1);
+			char finalBuf[BUFLEN];
+			// Indicate ur sending a file
+			if (packetCount == numPackets) {
+				finalBuf[0] = '1';
+			}
+			else {
+				finalBuf[0] = '0';
+			}
+			for (int i = 0; i < BUFLEN - 1; i++) {
+				finalBuf[i + 1] = newbuf[i];
+			}
+
+
+
+			/* Transfer the content to requested client */
+			if (sendto(s, finalBuf, BUFLEN, 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
+			{
+				printf("sendto() failed with error code : %d", WSAGetLastError());
+				/* Close the connection and unlock the mutex if there is a Socket Error */
+				closesocket(s);
+
+				return -1;
+			}
+			else
+			{
+				/* Reset the buffer and use the buffer for next transmission */
+				memset(buf, '\0', sizeof(buf));
+			}
+			packetCount += 1;
+		}
+		printf("File transferred");
+	}
+	else
+	{
+		printf("FILE ERROR");
+	}
+	fileToRead.close();
+
+
+
+	return 0;
 }

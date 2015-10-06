@@ -51,7 +51,7 @@ int Server::start() {
 
 		//print details of the client/peer and the data received
 		printf("Received packet from %s:%d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
-		printf("Data: %s\n", buf);
+		//printf("Data: %s\n", buf);
 		int typeBit = buf[0] - '0';
 		if (typeBit == 1) {
 			cout << "Send file";
@@ -65,9 +65,13 @@ int Server::start() {
 			string file(newBuf);
 			sendFile(file);
 		}
-		else {
+		else if(typeBit == 0) {
 			cout << "List";
 			sendList();
+		}
+		else if(typeBit == 2) {
+			cout << "GETTING A FILE";
+			receiveFile();
 		}
 	}
 
@@ -100,7 +104,7 @@ int Server::sendFile(string file) {
 		{
 			memset(buf, '\0', BUFLEN-1);
 			/* Read the contents of file and write into the buffer for transmission */
-			fileToRead.read(buf, BUFLEN);
+			fileToRead.read(buf, BUFLEN-1);
 			char finalBuf[BUFLEN];
 			if (packetCount == numPackets) {
 				finalBuf[0] = '1';
@@ -189,4 +193,49 @@ string Server::getFiles() {
 		perror("");
 		exit(EXIT_FAILURE);
 	}
+}
+
+int Server::receiveFile() {
+	string output = "";
+	int count = 0;
+	while (1) {
+		count += 1;
+		int numBytes = recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen);
+		if (numBytes == SOCKET_ERROR)
+		{
+			printf("recvfrom() failed with error code : %d", WSAGetLastError());
+			return -1;
+		}
+
+		
+		string file("fromt client.txt");
+
+		appendToFile(buf, 1, file);
+		if (buf[0] - '0' == 1) {
+			cout << "BReak";
+			break;
+		}
+		memset(buf, 0, sizeof(buf));
+
+	}
+	return 0;
+}
+
+
+int Server::appendToFile(char * buffer, int headerBits, string filename) {
+	ofstream fout(filename, ofstream::out | ofstream::app);
+	if (fout.is_open())
+	{
+		for (int i = headerBits; i != BUFLEN; i++)
+		{
+			fout << buffer[i];
+		}
+		return 0;
+	}
+	else
+	{
+		cout << "File could not be opened." << endl;
+		return -1;
+	}
+
 }
