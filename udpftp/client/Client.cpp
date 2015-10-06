@@ -66,6 +66,49 @@ int Client::getFile(char * filename) {
 	return 0;
 }
 
+void Client::displayList() {
+	strcpy_s(message, "0");
+	message[1] = '\0';
+
+	if (sendto(s, message, BUFLEN, 0, (struct sockaddr *) &si_other, slen) == SOCKET_ERROR)
+	{
+		printf("sendto() failed with error code : %d", WSAGetLastError());
+		exit(EXIT_FAILURE);
+	}
+
+	memset(buf, '\0', BUFLEN);
+	puts(buf);
+
+
+//	string output = "";
+	int count = 0;
+	while (1) {
+		count += 1;
+		int numBytes = recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen);
+		if (numBytes == SOCKET_ERROR)
+		{
+			printf("recvfrom() failed with error code : %d", WSAGetLastError());
+			exit(EXIT_FAILURE);
+		}
+
+		puts(buf);
+
+//		string file(filename);
+//		appendToFile(buf, 1, file);
+		if (buf[0] - '0' == 1) {
+			break;
+		}
+		memset(buf, 0, sizeof(buf));
+
+	}
+
+	closesocket(s);
+	WSACleanup();
+
+
+
+}
+
 int Client::appendToFile(char * buffer, int headerBits, string filename) {
 	ofstream fout(filename, ofstream::out | ofstream::app);
 	if (fout.is_open())

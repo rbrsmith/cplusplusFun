@@ -67,6 +67,7 @@ int Server::start() {
 		}
 		else {
 			cout << "List";
+			sendList();
 		}
 	}
 
@@ -138,4 +139,54 @@ int Server::sendFile(string file) {
 	
 	return 0;
 
+}
+
+int Server::sendList() {
+	
+	string files = getFiles();
+	
+
+
+	char buf[BUFLEN];
+	// We assume number of packets is 1
+	files = "1" + files;
+	strcpy_s(buf, files.c_str());
+	if (sendto(s, buf, recv_len, 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
+	{
+		printf("sendto() failed with error code : %d", WSAGetLastError());
+		/* Close the connection and unlock the mutex if there is a Socket Error */
+		closesocket(s);
+
+		return -1;
+	}
+	else
+	{
+		/* Reset the buffer and use the buffer for next transmission */
+		memset(buf, '\0', sizeof(buf));
+	}
+
+}
+
+string Server::getFiles() {
+	string output = "";
+	DIR *dir;
+	struct dirent *ent;
+	if ((dir = opendir(".")) != NULL) {
+		/* print all the files and directories within directory */
+		while ((ent = readdir(dir)) != NULL) {
+			string fname = ent->d_name;
+			if (fname.compare("..") == 0 || fname.compare(".") == 0) {
+				continue;
+			}
+			output += ent->d_name;
+			output += "\n";
+		}
+		return output;
+		closedir(dir);
+	}
+	else {
+		/* could not open directory */
+		perror("");
+		exit(EXIT_FAILURE);
+	}
 }

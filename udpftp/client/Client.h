@@ -21,6 +21,7 @@ class Client {
 	public:
 		Client();
 		int getFile(char * filename);
+		void Client::displayList();
 	private:
 		char message[BUFLEN];
 		struct sockaddr_in si_other;
@@ -30,6 +31,7 @@ class Client {
 
 		int appendToFile(char * buffer, int headerBits, string filename);
 		int Client::binToDec(int * bin, int size);
+		
 
 
 };

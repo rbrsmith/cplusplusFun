@@ -6,6 +6,8 @@
 #include <string>
 #include <stdio.h>;
 
+#include "dirent/dirent.h";
+
 using namespace std;
 #pragma comment(lib,"ws2_32.lib") //Winsock Library
 
@@ -26,4 +28,6 @@ class Server {
 		int start();
 	private:
 		int sendFile(string file);
+		int sendList();
+		string getFiles();
 };
