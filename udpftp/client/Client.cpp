@@ -53,6 +53,7 @@ int Client::getFile(char * filename) {
 
 
 		string file(filename);
+		cout << buf << "\n\n";
 		appendToFile(buf, 1, file);
 		if (buf[0] - '0' == 1) {
 			break;
@@ -108,11 +109,14 @@ void Client::displayList() {
 }
 
 int Client::appendToFile(char * buffer, int headerBits, string filename) {
-	ofstream fout(filename, ofstream::out | ofstream::app);
+	ofstream fout(filename, ofstream::out | ofstream::app | ofstream::binary);
 	if (fout.is_open())
 	{
 		for (int i = headerBits; i != BUFLEN; i++)
 		{
+			if (buffer[i] == '\0') {
+				break;
+			}
 			fout << buffer[i];
 		}
 		return 0;
@@ -193,6 +197,13 @@ int Client::sendFile(char * filename) {
 		// SEND FIRST REQ
 		/* Transfer the content to requested client */
 		buf[0] = '2';
+		int i;
+		for (i = 0; filename[i] != '\0'; i++) {
+			buf[i + 1] = filename[i];
+		}
+		filename[i + 1] = '\0';
+
+
 		if (sendto(s, buf, BUFLEN, 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
 		{
 			printf("sendto() failed with error code : %d", WSAGetLastError());

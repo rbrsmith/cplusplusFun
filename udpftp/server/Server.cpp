@@ -105,6 +105,9 @@ int Server::sendFile(string file) {
 			memset(buf, '\0', BUFLEN-1);
 			/* Read the contents of file and write into the buffer for transmission */
 			fileToRead.read(buf, BUFLEN-1);
+			cout << buf;
+			
+
 			char finalBuf[BUFLEN];
 			if (packetCount == numPackets) {
 				finalBuf[0] = '1';
@@ -115,6 +118,7 @@ int Server::sendFile(string file) {
 			for (int i = 0; i < BUFLEN - 1; ++i) {
 				finalBuf[i + 1] = buf[i];
 			}
+
 			
 			/* Transfer the content to requested client */
 			if (sendto(s, finalBuf, recv_len, 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
@@ -196,6 +200,11 @@ string Server::getFiles() {
 }
 
 int Server::receiveFile() {
+	char filename[BUFLEN - 1];
+	for (int i = 0; i < BUFLEN - 1; i++) {
+		filename[i] = buf[i + 1];
+	}
+	string file(filename);
 	string output = "";
 	int count = 0;
 	while (1) {
@@ -208,7 +217,7 @@ int Server::receiveFile() {
 		}
 
 		
-		string file("fromt client.txt");
+//		string file("fromt client.txt");
 
 		appendToFile(buf, 1, file);
 		if (buf[0] - '0' == 1) {
@@ -223,11 +232,16 @@ int Server::receiveFile() {
 
 
 int Server::appendToFile(char * buffer, int headerBits, string filename) {
-	ofstream fout(filename, ofstream::out | ofstream::app);
+	cout << filename << "\n\n";
+	filename = "tesst.txt";
+	ofstream fout(filename, ofstream::out | ofstream::app | ofstream::binary);
 	if (fout.is_open())
 	{
 		for (int i = headerBits; i != BUFLEN; i++)
 		{
+			if (buffer[i] == '\0') {
+				break;	
+			}
 			fout << buffer[i];
 		}
 		return 0;
@@ -237,5 +251,4 @@ int Server::appendToFile(char * buffer, int headerBits, string filename) {
 		cout << "File could not be opened." << endl;
 		return -1;
 	}
-
 }
