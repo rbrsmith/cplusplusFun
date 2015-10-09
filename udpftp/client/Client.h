@@ -1,6 +1,7 @@
 #pragma once
 #include "stdafx.h";
 #include <iostream>;
+#include "dirent\dirent.h";
 
 #include<stdio.h>
 #include<winsock.h>
@@ -15,8 +16,8 @@ using namespace std;
 #pragma comment(lib,"ws2_32.lib") //Winsock Library
 
 #define SERVER "127.0.0.1"  //ip address of udp server
-#define BODYLEN 256  //Max length of buffer
-#define BUFLEN 300
+#define BODYLEN 256  
+#define BUFLEN 300 //Max length of buffer
 #define PORT 8889   //The port on which to listen for incoming data
 
 class Client {
@@ -33,12 +34,17 @@ class Client {
 		int SYN;
 		int ACK;
 		int sequenceBit;
+		int finalBit;
+		int errorBit;
 		char body[BODYLEN];
 	};
 
 	public:
 		Client();
 		void printRemoteList();
+		void getFile(string filename);
+		void printLocalList();
+		void sendFile(string filename);
 	private:
 		void send(char * buffer);
 		int getRandomNumber();

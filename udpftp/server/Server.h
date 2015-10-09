@@ -7,6 +7,7 @@
 #include <stdio.h>;
 #include <ctime>;
 #include "dirent\dirent.h"
+#include "Log.h";
 
 #pragma comment(lib,"ws2_32.lib") //Winsock Library
 #define BUFLEN 300  //Max length of buffer
@@ -21,21 +22,26 @@ class Server {
 	WSADATA wsa;
 
 	int seq;
-
+	Log logger;
 
 	struct message {
 		int messageType;
 		int SYN;
 		int ACK;
 		int sequenceBit;
+		int finalBit;
+		int errorBit;
 		char body[BODYLEN];
 	};
 	int bufLen = sizeof(message);
 
 
+	
+
 	public:
 		void start();
 	private:
+
 		struct message * getDataFromClient(char *serverBuf);
 		int handshake();
 		int getRandomNumber();
@@ -43,4 +49,6 @@ class Server {
 		void list(int sequence);
 		int validateSequence(int remoteSeq);
 		void increaseSequence();
+		void get(struct message * msg);
+		void put(struct message * msg);
 };
