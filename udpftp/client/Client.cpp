@@ -19,6 +19,7 @@ Client::Client() {
 	si_other.sin_family = AF_INET;
 	si_other.sin_port = htons(PORT);
 	si_other.sin_addr.S_un.S_addr = inet_addr(SERVER);
+	logger.log("Client:  Client application started\n");
 
 }
 
@@ -26,6 +27,8 @@ void Client::send(char * buffer) {
 	if (sendto(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_other, slen) == SOCKET_ERROR)
 	{
 		printf("sendto() failed with error code : %d", WSAGetLastError());
+		logger.log("Client:  Error in sending data");
+		cout << "Sending data error";
 		exit(EXIT_FAILURE);
 	}
 	// Clear buffer
@@ -38,26 +41,43 @@ int Client::handshake() {
 	struct message *msg = (struct message *) buffer;
 	int syn = getRandomNumber();
 	msg->SYN = syn;
+	logger.log("Client:  Sending handshake SYN: ");
+	logger.log(syn);
+	logger.log("\n");
 	send(buffer);
 
 	char nextBuffer[BUFLEN];
 	if ((recv_len = recvfrom(s, nextBuffer, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
 	{	
-		printf("recvfrom() failed with error code : %d", WSAGetLastError());
+		logger.log("Client:  recvfrom() failed\n");
 		exit(EXIT_FAILURE);
 	}
 	else {
 		struct message *res = (struct message *) nextBuffer;
 		if (res->ACK != syn) {
-			cout << "Error in handshake, incorrect acknowledgment.  Expected " << syn << " recevied " << res->ACK << "\n";
+			logger.log("Client:  Error in handshake, incorrect acknowledgement from Server.  Exepceted ");
+			logger.log(syn);
+			logger.log(" received ");
+			logger.log(res->ACK);
+			logger.log("\n");
 			exit(EXIT_FAILURE);
 		}
 		else {
+			logger.log("Client:  Handshake received correct acknowledgement of ");
+			logger.log(res->ACK);
+			logger.log(" from server\n");
 			char finalBuffer[BUFLEN];
 			struct message *msg = (struct message *) finalBuffer;
 			msg->ACK = res->SYN;
-			send(finalBuffer);
 			int bit = res->SYN & (1 << 0);
+			logger.log("Client:  Sending acknowledgement of ");
+			logger.log(msg->ACK);
+			logger.log(" to server\n");
+			logger.log("Client:  Setting sequence bit to ");
+			logger.log(bit);
+			logger.log("\n");
+			send(finalBuffer);
+			
 			return bit;
 		}
 
@@ -66,12 +86,14 @@ int Client::handshake() {
 }
 
 void Client::printRemoteList() {
+	logger.log("Client:  Show remote files selected\n");
 	seq = handshake();
 	char buffer[BUFLEN];
 	struct message *msg = (struct message *) buffer;
 	msg->messageType = 0; //This is a LIST operation
 	msg->sequenceBit = seq;
-	
+
+
 	send(buffer);
 	increaseSequence();
 
@@ -79,6 +101,7 @@ void Client::printRemoteList() {
 	if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
 	{
 		printf("recvfrom() failed with error code : %d", WSAGetLastError());
+		logger.log("Error receiving data from server");
 		exit(EXIT_FAILURE);
 	}
 	else {
@@ -86,17 +109,26 @@ void Client::printRemoteList() {
 		validateSequence(resMsg->sequenceBit);
 		if (resMsg->errorBit == 1) {
 			cout << "Unable to get remote directory as remote directory is too large\n";
+			logger.log("Client:  Unable to get remote directory as remote directory is too large\n");
 			return;
 		}
 		cout << "Server Files:\n";
 		cout << "- - - - - - - \n";
+		logger.log("Client:  List of file successfuly arrived\n");
 		cout << resMsg->body;
 	}
 }
 
 void Client::getFile(string filename) {
+	logger.log("Client:  Get file selected\n");
+	logger.log("Client:  Filename: ");
+	char why[BODYLEN];
+	strcpy_s(why, filename.c_str());
+	logger.log(why);
+	logger.log("\n");
 	if (filename.length() > BODYLEN) {
 		cout << "Unable to get file, filename is too long\n";
+		logger.log("Client:  unable to get file, filename too long\n");
 		return;
 	}
 	seq = handshake();
@@ -116,18 +148,22 @@ void Client::getFile(string filename) {
 		if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
 		{
 			printf("recvfrom() failed with error code : %d", WSAGetLastError());
+			logger.log("Client:  Error in receiving data");
 			exit(EXIT_FAILURE);
 		}
 		else {
+			logger.log("Client:  Received file data from server\n");
 			struct message *resMsg = (struct message *) resBuffer;
 			validateSequence(resMsg->sequenceBit);
 			if (resMsg->errorBit == 1) {
 				cout << "ERROR: " << resMsg->body;
+				logger.log("Client:  Server responded with error, maybe file was not found\n");
 				return;
 			}
 			else {
 				outFile.write(resMsg->body, BODYLEN);
 				if (resMsg->finalBit == 1) {
+					logger.log("Client:  Final bit indicated file transfer has ended\n");
 					cout << "End of file transfer\n";
 					break;
 				}
@@ -138,6 +174,7 @@ void Client::getFile(string filename) {
 }
 
 void Client::printLocalList() {
+	logger.log("Client:  Print local listing requested\n");
 	string output = "";
 	DIR *dir;
 	struct dirent *ent;
@@ -153,28 +190,37 @@ void Client::printLocalList() {
 		}
 		closedir(dir);
 		cout << output << "\n";
+		logger.log("Client:  Local files listed successfully\n");
 	}
 	else {
 		/* could not open directory */
+		logger.log("\nClient:  Error getting file listing");
 		perror("Error getting file listing\n");
 		exit(EXIT_FAILURE);
 	}
 }
 
 void Client::sendFile(string filename) {
+	logger.log("Client:  Put command selected\n");
 	if (filename.length() > BODYLEN) {
 		cout << "Unable to send file, filename is too long";
+		logger.log("Client:  Unable to send file, filename is too long\n");
 		return;
 	}
 	seq = handshake();
 	
-
+	logger.log("\nSending file ");
+	char why[BODYLEN];
+	strcpy_s(why, filename.c_str());
+	logger.log(why);
+	logger.log(" to server\n");
 	cout << "Looking for file " << filename << "\n";
 
 	ifstream fileToRead;
 	fileToRead.open(filename, ios::in | ios::binary);
 	if (fileToRead.is_open())
 	{
+
 		// First packet is just filename
 		char buf[BUFLEN];
 		struct message * sendMsg = (struct message *) buf;
@@ -193,6 +239,10 @@ void Client::sendFile(string filename) {
 			numPackets += 1;
 			fileToRead.read(fakeBuf, BODYLEN);
 		}
+		logger.log("Client:  Will send ");
+		logger.log(numPackets);
+		logger.log(" packets to server\n");
+
 
 		fileToRead.clear();
 		fileToRead.seekg(0, ios::beg);
@@ -213,32 +263,36 @@ void Client::sendFile(string filename) {
 			fileToRead.read(sendMsg->body, BODYLEN);
 
 			if (packetCount >= numPackets) {
+				logger.log("Client:  Final packet, setting final bit\n");
 				sendMsg->finalBit = 1;
 			}
 			else {
 				sendMsg->finalBit = 0;
 			}
-
+			logger.log("Client:  Sent file packet to server\n");
 			send(buf);
 			packetCount += 1;
 		}
+		logger.log("Client:  File transfer complete\n");
 		cout << "File transfer complete\n";
 	}
 	else
 	{
+		logger.log("CLient:  Unable to find file\n");
 		cout << "Unable to find file\n";
 	}
 	fileToRead.close();
 }
 
-
+	
 int Client::validateSequence(int remoteSeq) {
 	if (remoteSeq == seq) {
+		logger.log("Client:  Sequence bits match up\n");
 		increaseSequence();
 		return 1;
 	}
 	else {
-		cout << "Sequence bits dont mathch\n";
+		logger.log("Client:  Sequence bits dont match up\n");
 		exit(EXIT_FAILURE);
 	}
 }

@@ -19,8 +19,9 @@ int main() {
 				break;
 			}
 			case 2:
-			{
-				cout << "Enter filename to retreive: ";
+			{	
+				client.printRemoteList();
+				cout << "\nEnter filename to retreive: ";
 				string filename;
 				cin >> filename;
 				cin.clear();
@@ -33,7 +34,8 @@ int main() {
 				break;
 			}
 			case 4:
-				cout << "Enter filename to send: ";
+				client.printLocalList();
+				cout << "\nEnter filename to send: ";
 				string filename;
 				cin >> filename;
 				cin.clear();

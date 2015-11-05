@@ -7,20 +7,23 @@ using namespace std;
 
 void Server::start() {
 
-	logger.log("\nNew Server instance started...\n");
+	logger.log("\nServer:  New Server instance started...\n");
+	
 
 	slen = sizeof(si_other);
 	//Initialise winsock
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 	{
-		logger.log("Unable to start winsock\n");
+		cout << "Error in winsock";
+		logger.log("Server:  Unable to start winsock\n");
 		exit(EXIT_FAILURE);
 	}
 	
 	//Create a socket
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == INVALID_SOCKET)
 	{
-		logger.log("Unable to create socket\n");
+		cout << "Error in creating socket";
+		logger.log("Server:  Unable to create socket\n");
 	}
 	
 	//Prepare the sockaddr_in structure
@@ -31,10 +34,12 @@ void Server::start() {
 	//Bind
 	if (bind(s, (struct sockaddr *)&server, sizeof(server)) == SOCKET_ERROR)
 	{
-		logger.log("Unable to bind\n");
+		cout << "Error in binding";
+		logger.log("Server:  Unable to bind\n");
 		exit(EXIT_FAILURE);
 	}
-	logger.log("Server started and waiting...\n");
+	logger.log("Server:  Server started and waiting...\n");
+	cout << "Server ready and waiting...\n";
 	//keep listening for data
 	char serverBuf[BUFLEN];
 	while (1)
@@ -43,21 +48,24 @@ void Server::start() {
 		switch (msg->messageType) {
 			case 0:
 				// List operation
-				logger.log("List operation called...\n");
+				logger.log("Server:  List operation called...\n");
+				cout << "LIST\n";
 				list(msg->sequenceBit);
 				break;
 			case 1:
 				// Get operation
-				logger.log("Get operation called...\n");
+				logger.log("Server:  Get operation called...\n");
+				cout << "GET\n";
 				get(msg);
 				break;
 			case 4:
 				// Put operation
-				logger.log("Put operation called...\n");
+				logger.log("Server:  Put operation called...\n");
+				cout << "PUT\n";
 				put(msg);
 				break;
 		}
-		logger.log("Waiting for request...\n");
+		logger.log("Server:  Server:  Waiting for request...\n");
 	}	
 
 
@@ -68,17 +76,17 @@ int Server::handshake() {
 	char buffer[BUFLEN];
 	if ((recv_len = recvfrom(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
 	{
-		logger.log("Error in recieving packet\n");
+		logger.log("Server:  Error in recieving packet\n");
 		exit(EXIT_FAILURE);
 	}
 	else {
 		struct message *msg = (struct message *) buffer;
-		logger.log("Received request from client with SYN: ");
+		logger.log("Server:  Received request from client with SYN: ");
 		logger.log(msg->SYN);
 		logger.log("\n");
 		
 		short syn = getRandomNumber();
-		logger.log("Replying with ACK: ");
+		logger.log("Server:  Replying with ACK: ");
 		logger.log(syn);
 		logger.log("\n");
 		char sendBuffer[BUFLEN];
@@ -89,22 +97,25 @@ int Server::handshake() {
 		char finalBuffer[BUFLEN];
 		if ((recv_len = recvfrom(s, finalBuffer, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
 		{
-			logger.log("Eror receiving from client");
+			logger.log("Server:  Eror receiving from client");
 			exit(EXIT_FAILURE);
 		}
 		else {
 			struct message *msg = (struct message *) finalBuffer;
-			logger.log("Received ");
+			logger.log("Server:  Received ");
 			logger.log(msg->ACK);
-			logger.log("\n");
+			logger.log(" from client\n");
 			if (msg->ACK != syn) {
-				logger.log("ACK's dont align in handshake\n");
+				logger.log("Server:  ACK's dont align in handshake\n");
 				exit(EXIT_FAILURE);
 			}
 			else {
-				logger.log("Handshake successful!\n\n");
 				// Extract least significant bit
 				int bit = syn & (1 << 0);
+				logger.log("Server:  Handshake successful!\n");
+				logger.log("Server:  Setting sequence bit to ");
+				logger.log(bit);
+				logger.log("\n");
 				return bit;
 			}
 		}
@@ -114,7 +125,7 @@ int Server::handshake() {
 void Server::send(char * buffer) {
 	if (sendto(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_other, slen) == SOCKET_ERROR)
 	{
-		logger.log("Sending error!");
+		logger.log("Server:  Sending error!");
 		exit(EXIT_FAILURE);
 	}
 	// Clear buffer
@@ -126,11 +137,11 @@ Server::message * Server::getDataFromClient(char *serverBuf) {
 	seq = handshake();
 	if ((recv_len = recvfrom(s, serverBuf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
 	{
-		logger.log("Failed to recieve data from client");
+		logger.log("Server:  Failed to recieve data from client");
 		exit(EXIT_FAILURE);
 	}
 	else {
-		logger.log("Incoming data from client...\n");
+		logger.log("Server:  Incoming data from client...\n");
 		struct message *resmsg = (struct message *) serverBuf;
 		return resmsg;
 	}
@@ -156,7 +167,7 @@ void Server::list(int incomingSeq) {
 	}
 	else {
 		/* could not open directory */
-		logger.log("Error getting file listing\n");
+		logger.log("Server:  Error getting file listing\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -166,14 +177,14 @@ void Server::list(int incomingSeq) {
 	sendMsg->sequenceBit = seq;
 	increaseSequence();
 	if (output.length() >= BODYLEN) {
-		logger.log("Unable to send file listing, listing is too large");
+		logger.log("Server:  Unable to send file listing, listing is too large");
 		sendMsg->errorBit = 1;
 		send(sendBuffer);
 		exit(EXIT_FAILURE);
 	}
 	strcpy_s(sendMsg->body, output.c_str());
 	send(sendBuffer);
-	logger.log("List of files end to client\n");
+	logger.log("Server:  List of files send to client\n");
 }
 
 void Server::get(struct message * msg) {
@@ -181,7 +192,12 @@ void Server::get(struct message * msg) {
 	string filename = msg->body;
 
 
-	logger.log("Looking for file...\n");
+	logger.log("Server:  Looking for file: ");
+	logger.log("Filename: ");
+	char why[BODYLEN];
+	strcpy_s(why, filename.c_str());
+	logger.log(why);
+	logger.log("\n");
 
 	ifstream fileToRead;
 	fileToRead.open(filename, ios::in | ios::binary);
@@ -196,6 +212,9 @@ void Server::get(struct message * msg) {
 			numPackets += 1;
 			fileToRead.read(fakeBuf, BODYLEN);
 		}
+		logger.log("Server:  Sending ");
+		logger.log(numPackets);
+		logger.log(" packets to server\n");
 
 		fileToRead.clear();
 		fileToRead.seekg(0, ios::beg);
@@ -216,6 +235,7 @@ void Server::get(struct message * msg) {
 			fileToRead.read(sendMsg->body, BODYLEN);
 
 			if (packetCount == numPackets) {
+				logger.log("Server:  Last packet, setting final bit\n");
 				sendMsg->finalBit = 1;
 			}
 			else {
@@ -223,9 +243,11 @@ void Server::get(struct message * msg) {
 			}
 
 			send(buf);
+			logger.log("Server:  Sending file packet\n");
 			packetCount += 1;
 		}
-		logger.log("File transfer complete\n");
+		cout << "File transfer complete\n";
+		logger.log("Server:  File transfer complete\n");
 	}
 	else
 	{
@@ -234,7 +256,8 @@ void Server::get(struct message * msg) {
 		sendMsg->sequenceBit = seq;
 		increaseSequence();
 		sendMsg->errorBit = 1;
-		logger.log("Unable to find file\n");
+		logger.log("Server:  Unable to find file\n");
+		cout << "Unable to find file\n";
 		strcpy_s(sendMsg->body, "File was not found");
 		send(buf);
 	}
@@ -253,7 +276,8 @@ void Server::put(struct message * msg) {
 	while (1) {
 		if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
 		{
-			logger.log("Error recieving data from client");
+			logger.log("Server:  Error recieving data from client");
+			cout << "Error receiving data";
 			exit(EXIT_FAILURE);
 		}
 		else {
@@ -262,6 +286,7 @@ void Server::put(struct message * msg) {
 			
 			outFile.write(resMsg->body, BODYLEN);
 			if (resMsg->finalBit == 1) {
+				cout << "End of file transfer\n";
 				logger.log("End of file transfer\n");
 				break;
 			}
@@ -272,12 +297,12 @@ void Server::put(struct message * msg) {
 
 int Server::validateSequence(int remoteSeq) {
 	if (remoteSeq == seq) {
-		logger.log("Sequence bits match up\n");
+		logger.log("Server:  Sequence bits match up\n");
 		increaseSequence();
 		return 1;
 	}
 	else {
-		logger.log("Sequence bits don't match\n");
+		logger.log("Server:  Sequence bits don't match\n");
 		exit(EXIT_FAILURE);
 	}
 }

@@ -9,6 +9,7 @@
 #include<string>
 #include <fstream>
 #include <ctime>
+#include "Log.h";
 
 using namespace std;
 
@@ -21,7 +22,8 @@ using namespace std;
 #define PORT 8889   //The port on which to listen for incoming data
 
 class Client {
-		
+
+	Log logger;
 	struct sockaddr_in si_other;
 	int s, slen = sizeof(si_other);
 	int recv_len;
@@ -38,7 +40,7 @@ class Client {
 		int errorBit;
 		char body[BODYLEN];
 	};
-
+		
 	public:
 		Client();
 		void printRemoteList();

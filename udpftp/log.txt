@@ -1,0 +1,230 @@
+
+Server:  New Server instance started...
+Server:  Server started and waiting...
+Client:  Client application started
+Client:  Show remote files selected
+Client:  Sending handshake SYN: 138
+Server:  Received request from client with SYN: 138
+Server:  Replying with ACK: 287
+Client:  Handshake received correct acknowledgement of 138 from server
+Client:  Sending acknowledgement of 287 to server
+Client:  Setting sequence bit to 1
+Server:  Received 287 from client
+Server:  Handshake successful!
+Server:  Setting sequence bit to 1
+Server:  Incoming data from client...
+Server:  List operation called...
+Server:  Sequence bits match up
+Server:  List of files send to client
+Client:  Sequence bits match up
+Server:  Server:  Waiting for request...
+Client:  List of file successfuly arrived
+Client:  Get file selected
+Client:  Filename: test.pdf
+Client:  Sending handshake SYN: 148
+Server:  Received request from client with SYN: 148
+Server:  Replying with ACK: 297
+Client:  Handshake received correct acknowledgement of 148 from server
+Client:  Sending acknowledgement of 297 to server
+Client:  Setting sequence bit to 1
+Server:  Received 297 from client
+Server:  Handshake successful!
+Server:  Setting sequence bit to 1
+Server:  Incoming data from client...
+Server:  Get operation called...
+Server:  Sequence bits match up
+Server:  Looking for file: Filename: test.pdf
+Server:  Sending 64 packets to server
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+om server
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Sending file packet
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Server:  Last packet, setting final bit
+Client:  Sequence bits match up
+Server:  Sending file packet
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Server:  File transfer complete
+Client:  Received file data from server
+Server:  Server:  Waiting for request...
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Received file data from server
+Client:  Sequence bits match up
+Client:  Final bit indicated file transfer has ended
