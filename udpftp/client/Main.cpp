@@ -34,6 +34,7 @@ int main() {
 				break;
 			}
 			case 4:
+			{
 				client.printLocalList();
 				cout << "\nEnter filename to send: ";
 				string filename;
@@ -41,7 +42,11 @@ int main() {
 				cin.clear();
 				client.sendFile(filename);
 				break;
-
+			}
+			case 5: 
+			{
+				client.test();
+			}
 		}
 
 		

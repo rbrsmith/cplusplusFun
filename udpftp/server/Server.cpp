@@ -9,8 +9,6 @@ void Server::start() {
 
 	logger.log("\nServer:  New Server instance started...\n");
 	
-
-	slen = sizeof(si_other);
 	//Initialise winsock
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 	{
@@ -18,32 +16,77 @@ void Server::start() {
 		logger.log("Server:  Unable to start winsock\n");
 		exit(EXIT_FAILURE);
 	}
-	
+
 	//Create a socket
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == INVALID_SOCKET)
 	{
 		cout << "Error in creating socket";
 		logger.log("Server:  Unable to create socket\n");
 	}
-	
-	//Prepare the sockaddr_in structure
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons(PORT);
 
-	//Bind
-	if (bind(s, (struct sockaddr *)&server, sizeof(server)) == SOCKET_ERROR)
-	{
-		cout << "Error in binding";
-		logger.log("Server:  Unable to bind\n");
-		exit(EXIT_FAILURE);
+	//Prepare the sockaddr_in structure
+
+	memset((char *)&si_in, 0, sizeof(si_in));
+	si_in.sin_family = AF_INET;
+	si_in.sin_port = htons(IN_PORT);
+	si_in.sin_addr.s_addr = INADDR_ANY;
+
+	//Bind the UDP port1
+	if (bind(s, (LPSOCKADDR)&si_in, sizeof(si_in)) == SOCKET_ERROR) {
+		logger.log("Server:  Error binding in port\n");
+		cout << "Error binding";
+		exit(-1);
 	}
+
+
+
+	memset((char *)&si_out, 0, sizeof(si_out));
+	si_out.sin_family = AF_INET;
+	si_out.sin_port = htons(OUT_PORT);
+	si_out.sin_addr.S_un.S_addr = inet_addr(SERVER);
+
+
 	logger.log("Server:  Server started and waiting...\n");
 	cout << "Server ready and waiting...\n";
 	//keep listening for data
 	char serverBuf[BUFLEN];
-	while (1)
-	{
+	int count = 1;
+	//while (1)
+	//{
+	//	// testing
+	//	if ((recv_len = recvfrom(s, serverBuf, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+	//	{
+	//		cout << WSAGetLastError();
+	//		cout << "Server error\n";
+	//		logger.log("Server:  Error in recieving packet\n");
+	//		exit(EXIT_FAILURE);
+	//	}
+	//	else {
+	//		struct message *msg = (struct message *) serverBuf;
+	//		if (msg->testBit == 1) {
+	//			cout << "Packet with test bit set received\n";
+	//			if (count > 0) {
+	//				char buffer[BUFLEN];
+	//				memset(buffer, '\0', BUFLEN);
+	//				struct message *res = (struct message *) buffer;
+	//				res->testBit = count;
+	//				res->testNum = msg->testNum;
+	//				cout << "Sending test response with testNum = " << msg->testNum << "\n";
+	//				send(buffer);
+	//			}
+	//			else {
+	//				cout << "Not sending response because im mean\n";
+	//			}
+	//			count += 1;
+	//		}
+	//		else {
+	//			cout << "Packet with test bit not set received\n";
+	//		}
+	//	}
+	////	exit(0);
+	//	// END TEST
+	//}
+	while(1) {
 		struct message * msg = getDataFromClient(serverBuf);
 		switch (msg->messageType) {
 			case 0:
@@ -74,57 +117,85 @@ void Server::start() {
 int Server::handshake() {
 	// Get SYN
 	char buffer[BUFLEN];
-	if ((recv_len = recvfrom(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
-	{
-		logger.log("Server:  Error in recieving packet\n");
-		exit(EXIT_FAILURE);
-	}
-	else {
-		struct message *msg = (struct message *) buffer;
-		logger.log("Server:  Received request from client with SYN: ");
-		logger.log(msg->SYN);
-		logger.log("\n");
-		
-		short syn = getRandomNumber();
-		logger.log("Server:  Replying with ACK: ");
-		logger.log(syn);
-		logger.log("\n");
-		char sendBuffer[BUFLEN];
-		struct message *response = (struct message *) sendBuffer;
-		response->SYN = syn;
-		response->ACK = msg->SYN;
-		Server::send(sendBuffer);
-		char finalBuffer[BUFLEN];
-		if ((recv_len = recvfrom(s, finalBuffer, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
-		{
-			logger.log("Server:  Eror receiving from client");
-			exit(EXIT_FAILURE);
+	int syn = -1;
+	int ack = -1;
+	while (1) {
+		recv_len = recvfrom(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen);
+		if (recv_len == SOCKET_ERROR) {
+			logger.log("Server:  Error in recvfrom in handshake");
+			exit(-1);
 		}
-		else {
-			struct message *msg = (struct message *) finalBuffer;
-			logger.log("Server:  Received ");
-			logger.log(msg->ACK);
+
+		struct message *rec_msg = (struct message *) buffer;
+		if (rec_msg->SYN > 0) {
+			logger.log("Server:  Received SYN of ");
+			logger.log(rec_msg->SYN);
 			logger.log(" from client\n");
-			if (msg->ACK != syn) {
-				logger.log("Server:  ACK's dont align in handshake\n");
-				exit(EXIT_FAILURE);
+			// Send a response
+			char nextBuffer[BUFLEN];
+			struct message *res = (struct message *) nextBuffer;
+			res->ACK = rec_msg->SYN;
+			res->SYN = getRandomNumber();
+			ack = res->SYN;
+			logger.log("Server:  Sending response with ACK of ");
+			logger.log(res->ACK);
+			logger.log(" and SYN of ");
+			logger.log(res->SYN);
+			logger.log("\n");
+			send(nextBuffer);
+		}
+		else if (rec_msg->ACK > 0) {
+			if (ack == -1) {
+				logger.log("Server:  Error in handshake, exiting\n");
+				exit(-1);
 			}
-			else {
-				// Extract least significant bit
-				int bit = syn & (1 << 0);
-				logger.log("Server:  Handshake successful!\n");
-				logger.log("Server:  Setting sequence bit to ");
-				logger.log(bit);
-				logger.log("\n");
-				return bit;
+			if (rec_msg->ACK == ack) {
+				logger.log("Server:  Recieved correct ACK of ");
+				logger.log(rec_msg->ACK);
+				logger.log(" from client\n");
+				char nextBuffer[BUFLEN];
+				struct message *res = (struct message *) nextBuffer;
+				// Send empty buffer to close loop
+				send(nextBuffer);
+				fd_set rfds;
+				struct timeval tv;
+				int retval;
+				tv.tv_sec = TIMEOUT;
+				tv.tv_usec = 0;
+
+				FD_ZERO(&rfds);
+				FD_SET(s, &rfds);
+				retval = select(1, &rfds, NULL, NULL, &tv);
+				if (retval == -1) {
+					cout << "Error in select\n";
+					logger.log("Server:  Error in select, exiting\n");
+					exit(-1);
+				}
+				if (!retval) {
+					logger.log("Server:  No more handshakes arriving from client. Handshake success!\n");
+					cout << "Handdshake completed\n";
+					return 0;
+				}
+				else {
+					// Crap, client must not have got our last message, oh well, onwards we march
+					// Send one last time, otherwise we'll let client figure out connection is dead
+					send(nextBuffer);
+					cout << "Handdshake completed\n";
+					return 0;
+				}
 			}
 		}
+
+
 	}
+
 }
 
 void Server::send(char * buffer) {
-	if (sendto(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_other, slen) == SOCKET_ERROR)
+	if (sendto(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_out, slen) == SOCKET_ERROR)
 	{
+		cout << "error sending";
+		cout << WSAGetLastError();
 		logger.log("Server:  Sending error!");
 		exit(EXIT_FAILURE);
 	}
@@ -135,12 +206,15 @@ void Server::send(char * buffer) {
 
 Server::message * Server::getDataFromClient(char *serverBuf) {
 	seq = handshake();
-	if ((recv_len = recvfrom(s, serverBuf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
+	exit(-2);
+	if ((recv_len = recvfrom(s, serverBuf, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
 	{
+		cout << "Error in recvform";
 		logger.log("Server:  Failed to recieve data from client");
 		exit(EXIT_FAILURE);
 	}
 	else {
+		cout << "Incoming data\n";
 		logger.log("Server:  Incoming data from client...\n");
 		struct message *resmsg = (struct message *) serverBuf;
 		return resmsg;
@@ -274,7 +348,7 @@ void Server::put(struct message * msg) {
 	// First package is filename
 	char resBuffer[BUFLEN];
 	while (1) {
-		if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
+		if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
 		{
 			logger.log("Server:  Error recieving data from client");
 			cout << "Error receiving data";
@@ -309,7 +383,7 @@ int Server::validateSequence(int remoteSeq) {
 
 int Server::getRandomNumber() {
 	srand((unsigned)time(0));
-	int randNum = (rand() % 300) + 150;
+	int randNum = (rand() % 300) + 1	;
 	return randNum;
 }
 

@@ -9,6 +9,7 @@
 #include<string>
 #include <fstream>
 #include <ctime>
+#include <vector>
 #include "Log.h";
 
 using namespace std;
@@ -18,15 +19,20 @@ using namespace std;
 
 #define SERVER "127.0.0.1"  //ip address of udp server
 #define BODYLEN 256  
-#define BUFLEN 300 //Max length of buffer
-#define PORT 8889   //The port on which to listen for incoming data
+#define BUFLEN 2048 //Max length of buffer
+#define IN_PORT 5000 
+#define OUT_PORT 7000
+#define TIMEOUT 1
 
 class Client {
 
 	Log logger;
-	struct sockaddr_in si_other;
-	int s, slen = sizeof(si_other);
+	struct sockaddr_in si_in;
+	struct sockaddr_in si_out;
+	int s, slen = sizeof(si_out);
 	int recv_len;
+	int s2 = sizeof(si_out);
+	int s3 = sizeof(si_out);
 	WSADATA wsa;
 
 	int seq;
@@ -38,6 +44,8 @@ class Client {
 		int sequenceBit;
 		int finalBit;
 		int errorBit;
+		int testBit;
+		int testNum;
 		char body[BODYLEN];
 	};
 		
@@ -47,6 +55,8 @@ class Client {
 		void getFile(string filename);
 		void printLocalList();
 		void sendFile(string filename);
+		void test();
+		void sendPackets(vector<message> msgV, int numberOfPackets, int windowSize, int timeout);
 	private:
 		void send(char * buffer);
 		int getRandomNumber();
