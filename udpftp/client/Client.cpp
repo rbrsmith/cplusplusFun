@@ -122,7 +122,7 @@ void Client::test() {
 	msg->testNum = 9;
 	msgV.at(9) = *msg;
 
-	sendPackets(msgV, numberOfPackets, windowSize, TIMEOUT);
+	sendPackets(msgV, numberOfPackets, windowSize, (TIMEOUT_SECS + TIMEOUT_MASECS));
 }
 
 
@@ -155,8 +155,8 @@ void Client::sendPackets(vector<message> msgV, int numberOfPackets, int windowSi
 	fd_set rfds;
 	struct timeval tv;
 	int retval;
-	tv.tv_sec = TIMEOUT;
-	tv.tv_usec = 0;
+	tv.tv_sec = TIMEOUT_SECS;
+	tv.tv_usec = TIMEOUT_MASECS;
 	time(&timev);
 	
 	int numPacketsEnRoute = windowSize;
@@ -202,7 +202,7 @@ void Client::sendPackets(vector<message> msgV, int numberOfPackets, int windowSi
 				if (t_sent == 0) {
 					continue;
 				}
-				if (t >= t_sent + TIMEOUT) {
+				if (t >= t_sent + (TIMEOUT_SECS)) {
 					struct message m = msgV.at(i);
 					memset(buffer, '\0', BUFLEN);
 					msg = (struct message *) buffer;
@@ -276,7 +276,104 @@ void Client::send(char * buffer) {
 	}
 	// Clear buffer
 	memset(buffer, '\0', BUFLEN);
+}
 
+char * Client::reliableSend(char * buffer) {
+	fd_set rfds;
+	struct timeval tv;
+	int retval;
+	tv.tv_sec = TIMEOUT_SECS;
+	tv.tv_usec = TIMEOUT_MASECS;
+	char buffer_bu[BUFLEN];
+	memcpy(buffer_bu, buffer, BUFLEN);
+	send(buffer);
+
+	char resBuffer[BUFLEN];
+	while (true) {
+		FD_ZERO(&rfds);
+		FD_SET(s, &rfds);
+		retval = select(1, &rfds, NULL, NULL, &tv);
+		if (retval == -1) {
+			logger.log("Client:  Error in select\n");
+			cout << "Error in select";
+			exit(-1);
+		}
+		if (!retval) {
+			logger.log("Client:  Timeout in reliable send (no sequence), resending\n");
+			char buffer[BUFLEN];
+			memcpy(buffer, buffer_bu, BUFLEN);
+			send(buffer);
+		}
+		else {
+			logger.log("Client:  Reliable send (no sequence) response received\n");
+			memset(buffer, '\0', BUFLEN);
+			if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+			{
+				logger.log("Client:  recvfrom() failed\n");
+				exit(EXIT_FAILURE);
+			}
+			logger.log("Client:  Received a packet in reliable send (no sequence)\n");
+			return resBuffer;
+		}
+	}
+	return resBuffer;
+}
+
+char * Client::reliableSend(char * buffer, int sequence) {
+	fd_set rfds;
+	struct timeval tv;
+	int retval;
+	tv.tv_sec = TIMEOUT_SECS;
+	tv.tv_usec = TIMEOUT_MASECS;
+	char buffer_bu[BUFLEN];
+	memcpy(buffer_bu, buffer, BUFLEN);
+	cout << "reliable send1 sending\n";
+	send(buffer);
+
+	char resBuffer[BUFLEN];
+	while (true) {
+		FD_ZERO(&rfds);
+		FD_SET(s, &rfds);
+		retval = select(1, &rfds, NULL, NULL, &tv);
+		if (retval == -1) {
+			logger.log("Client:  Error in select\n");
+			cout << "Error in select";
+			exit(-1);
+		}
+		if (!retval) {
+			logger.log("Client:  Timeout in reliable send, resending\n");
+			char buffer[BUFLEN];
+			memcpy(buffer, buffer_bu, BUFLEN);
+			send(buffer);
+			cout << "reliable send1 resending\n";
+		}
+		else {
+			logger.log("Client:  Reliable send response received\n");
+			memset(buffer, '\0', BUFLEN);
+			if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+			{
+				logger.log("Client:  recvfrom() failed\n");
+				exit(EXIT_FAILURE);
+			} 
+			struct message *resMsg = (struct message *) resBuffer;
+			cout << resMsg->sequence << "\n";
+			if (resMsg->sequence != sequence) {
+				cout << sequence << "\n";
+				logger.log("Client:  Wrong packet arrived in reliable send.  Resending\n"); char buffer[BUFLEN];
+				memcpy(buffer, buffer_bu, BUFLEN);
+				cout << "reliable send1 resending 2\n";
+				send(buffer);
+
+			}
+			else {
+				logger.log("Client:  Received correct packet in reliable send\n");
+				return resBuffer;
+			}
+		}
+
+
+	}
+	return resBuffer;
 }
 
 int Client::handshake() {
@@ -285,6 +382,7 @@ int Client::handshake() {
 	struct message *msg = (struct message *) buffer;
 	int syn = getRandomNumber();
 	msg->SYN = syn;
+	msg->messageType = -1;
 	logger.log("Client:  Sending handshake SYN: ");
 	logger.log(msg->SYN);
 	logger.log("\n");
@@ -294,8 +392,8 @@ int Client::handshake() {
 	fd_set rfds;
 	struct timeval tv;
 	int retval;
-	tv.tv_sec = TIMEOUT;
-	tv.tv_usec = 0;
+	tv.tv_sec = TIMEOUT_SECS;
+	tv.tv_usec = TIMEOUT_MASECS;
 
 	FD_ZERO(&rfds);
 	FD_SET(s, &rfds);
@@ -308,6 +406,7 @@ int Client::handshake() {
 	}
 	while (!retval) {
 		msg->SYN = syn;
+		msg->messageType = -1;
 		logger.log("Client:  Timeout in handshake.  Resending\n");
 		logger.log("Client:  Sending handshake SYN: ");
 		logger.log(msg->SYN);
@@ -326,11 +425,16 @@ int Client::handshake() {
 		else {
 			struct message *res = (struct message *) nextBuffer;
 			if (res->ACK != syn) {
-				logger.log("Client:  Error in handshake, incorrect acknowledgement from Server.  Expceted ");
+				logger.log("Client:  Error in handshake, incorrect acknowledgement from Server.  Expected ");
+				logger.log("Client:  Timeout in handshake.  Resending\n");
+				logger.log("Client:  Sending handshake SYN: ");
+				logger.log(msg->SYN);
+				logger.log("\n");
 				logger.log(syn);
 				logger.log(" received ");
 				logger.log(res->ACK);
 				logger.log("\n");
+				cout << "Error in hs";
 				exit(EXIT_FAILURE);
 			}
 			else {
@@ -340,41 +444,73 @@ int Client::handshake() {
 				char finalBuffer[BUFLEN];
 				struct message *msg = (struct message *) finalBuffer;
 				msg->ACK = res->SYN;
+				msg->messageType = -1;
 				logger.log("Client:  Sending acknowledgement of ");
 				logger.log(msg->ACK);
 				logger.log(" to server\n");
 				send(finalBuffer);
-				retval = select(1, &rfds, NULL, NULL, &tv);
 				
 				int tries = 0;
-				while (!retval) {
-					tries += 1;
-					if (tries > 50) {
-						logger.log("Client:  Unable to establish last step with server.  Assuming server received final step and moving on\n");
-						return 0;
-					}
-					// resend
-					logger.log("Client:  Timeout in handshake third step.  Resending\n");
-					struct message *msg = (struct message *) finalBuffer;
-					msg->ACK = res->SYN; 
-					logger.log("Client:  Sending acknowledgement of ");
-					logger.log(msg->ACK);
-					logger.log(" to server\n");
-					send(finalBuffer);
+				time_t  timev;
+				time(&timev);
+				while (true) {
 					FD_ZERO(&rfds);
 					FD_SET(s, &rfds);
 					retval = select(1, &rfds, NULL, NULL, &tv);
+					if (retval == -1) {
+						cout << "Error in select\n";
+						logger.log("Client:  Error in select\n");
+						exit(-1);
+					}
+					if (!retval) {
+						// resend
+						time_t timev2;
+						time(&timev2);
+						if (timev2 > timev + MAX_WAIT) {
+							logger.log("Client:  Multiple timeouts occured on final handshake step\nClient:  Handshake complete\n");
+							cout << "Handshake Complete\n";
+							Sleep(1000 * MAX_WAIT);
+							return 0;
+						}
+						logger.log("Client:  Timeout in handshake third step.  Resending\n");
+						struct message *msg = (struct message *) finalBuffer;
+						msg->ACK = res->SYN;
+						msg->messageType = -1;
+						logger.log("Client:  Sending acknowledgement of ");
+						logger.log(msg->ACK);
+						logger.log(" to server\n");
+						send(finalBuffer);
+						tries += 1;
+						continue;
+					}
+					if (FD_ISSET(s, &rfds)) {
+						char buffer[BUFLEN];
+						if ((recv_len = recvfrom(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+						{
+							logger.log("Client:  recvfrom() failed\n");
+							exit(EXIT_FAILURE);
+						}
+						struct message *msg = (struct message *) buffer;
+						if (msg->ACK == -1 && msg->SYN == -1) {
+							cout << "Handshake completed\n";
+							logger.log("Client:  Handshake completed successfully!\n");
+							Sleep(1000 * MAX_WAIT);
+							return 0;
+						}
+						else {
+							logger.log("Client:  Incorrect packet arrival in handshake third step.  Resending\n");
+							struct message *msg = (struct message *) finalBuffer;
+							msg->ACK = res->SYN;
+							msg->messageType = -1;
+							logger.log("Client:  Sending acknowledgement of ");
+							logger.log(msg->ACK);
+							logger.log(" to server\n");
+							send(finalBuffer);
+							tries += 1;
+						}
+					}
 				}
-				if (retval == -1) {
-					cout << "Error in select\n";
-					logger.log("Client:  Error in select\n");
-					exit(-1);
-				}
-				if (FD_ISSET(s, &rfds)) {
-					cout << "Handshake completed\n";
-					logger.log("Client:  Handshake completed successfully!\n");
-					return 0;
-				}
+				
 			}
 		}
 	}	
@@ -382,37 +518,30 @@ int Client::handshake() {
 
 void Client::printRemoteList() {
 	logger.log("Client:  Show remote files selected\n");
-	seq = handshake();
-	exit(-2);
+	handshake();
+
 	char buffer[BUFLEN];
 	struct message *msg = (struct message *) buffer;
 	msg->messageType = 0; //This is a LIST operation
-	msg->sequenceBit = seq;
+	msg->sequence = getRandomNumber();
+	cout << "Sending packet with mtype " << msg->messageType << " and sequence " << msg->sequence << "\n";
+	char * resBuf = reliableSend(buffer, msg->sequence);
+	cout << "HERE";
+	struct message * resMsg = (struct message *) resBuf;
+	logger.log("Client:  Display remote listing to user\n");
+	cout << "\n" << resMsg->body;
 
 
-	send(buffer);
-	increaseSequence();
+	// We got what we wanted, now tell Server to exit list mode
+	memset(buffer, '\0', BUFLEN);
+	struct message * m = (struct message *) buffer;
+	m->messageType = -1;
+	struct message * exitListMsg = (struct message *) buffer;
+	memset(resBuf, '/0', BUFLEN);
+	logger.log("Client:  Sending exit list message to server\n");
+	resBuf = reliableSend(buffer);
+	resMsg = (struct message *) resBuf;
 
-	char resBuffer[BUFLEN];
-	if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
-	{
-		printf("recvfrom() failed with error code : %d", WSAGetLastError());
-		logger.log("Error receiving data from server");
-		exit(EXIT_FAILURE);
-	}
-	else {
-		struct message *resMsg = (struct message *) resBuffer;
-		validateSequence(resMsg->sequenceBit);
-		if (resMsg->errorBit == 1) {
-			cout << "Unable to get remote directory as remote directory is too large\n";
-			logger.log("Client:  Unable to get remote directory as remote directory is too large\n");
-			return;
-		}
-		cout << "Server Files:\n";
-		cout << "- - - - - - - \n";
-		logger.log("Client:  List of file successfuly arrived\n");
-		cout << resMsg->body;
-	}
 }
 
 void Client::getFile(string filename) {
@@ -428,10 +557,87 @@ void Client::getFile(string filename) {
 		return;
 	}
 	seq = handshake();
+
 	char buffer[BUFLEN];
 	struct message *msg = (struct message *) buffer;
+	msg->messageType = 1; //This is a GET operation
+	int seq = getRandomNumber();
+	msg->sequence = seq;
+	strcpy_s(msg->body, filename.c_str());
+	cout << "SEQUENCE = " << msg->sequence << "\n";
+	cout << "BODY = " << msg->body << "\n";
+
+
+
+	fd_set rfds;
+	struct timeval tv;
+	int retval;
+	tv.tv_sec = TIMEOUT_SECS;
+	tv.tv_usec = TIMEOUT_MASECS;
+	send(buffer);
+	char firstPacket[BUFLEN];
+	char resBuffer[BUFLEN];
+	while (true) {
+		FD_ZERO(&rfds);
+		FD_SET(s, &rfds);
+		retval = select(1, &rfds, NULL, NULL, &tv);
+		if (retval == -1) {
+			logger.log("Client:  Error in select\n");
+			cout << "Error in select";
+			exit(-1);
+		}
+		if (!retval) {
+			logger.log("Client:  Timeout in reliable send, resending\n");
+			msg->messageType = 1;
+			msg->sequence = seq;
+			strcpy_s(msg->body, filename.c_str());
+			send(buffer);
+			cout << "resending filename\n";
+		}
+		else {
+			cout << "Filename response received \n";
+			memset(buffer, '\0', BUFLEN);
+			if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+			{
+				logger.log("Client:  recvfrom() failed\n");
+				exit(EXIT_FAILURE);
+			}
+			struct message *resMsg = (struct message *) resBuffer;
+			cout << resMsg->sequence << "\n";
+			if (resMsg->sequence == seq) {
+				cout << "Got sequence back from server, ready to start receiving files\n";
+				deliverFile();
+				break;
+			}
+			else if (resMsg->sequence > seq) {
+				cout << "OH SHIT, server is already sending us files, get ready to recceive and this is the first paccket\n";
+				deliverFile(resMsg);
+				break;
+			}
+			else {
+				cout << "Weird = what packet is this?\n";
+				msg->sequence = seq;
+				strcpy_s(msg->body, filename.c_str());
+				send(buffer);
+				cout << "resending filename\n";
+			}
+			
+		}	
+
+	}
+
+
+
+
+
+
+
+
+	
+
+	/*char buffer[BUFLEN];
+	struct message *msg = (struct message *) buffer;
 	msg->messageType = 1;
-	msg->sequenceBit = seq;
 	increaseSequence();
 	strcpy_s(msg->body, filename.c_str());
 	send(buffer);
@@ -450,7 +656,6 @@ void Client::getFile(string filename) {
 		else {
 			logger.log("Client:  Received file data from server\n");
 			struct message *resMsg = (struct message *) resBuffer;
-			validateSequence(resMsg->sequenceBit);
 			if (resMsg->errorBit == 1) {
 				cout << "ERROR: " << resMsg->body;
 				logger.log("Client:  Server responded with error, maybe file was not found\n");
@@ -466,6 +671,16 @@ void Client::getFile(string filename) {
 			}
 		}
 	}
+*/
+}
+
+void Client::deliverFile(struct message * firstMsg) {
+	cout << "READY WITH FIRST PACKET SIR\n";
+	cout << firstMsg->body;
+}
+
+void Client::deliverFile() {
+	cout << "READY WITH NO PACKET SIR\n";
 
 }
 
@@ -520,7 +735,6 @@ void Client::sendFile(string filename) {
 		// First packet is just filename
 		char buf[BUFLEN];
 		struct message * sendMsg = (struct message *) buf;
-		sendMsg->sequenceBit = seq;
 		increaseSequence();
 		strcpy_s(sendMsg->body, filename.c_str());
 		sendMsg->messageType = 4;
@@ -552,7 +766,6 @@ void Client::sendFile(string filename) {
 
 
 			struct message * sendMsg = (struct message *) buf;
-			sendMsg->sequenceBit = seq;
 			increaseSequence();
 
 			/* Read the contents of file and write into the buffer for transmission */

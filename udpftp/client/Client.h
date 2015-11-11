@@ -22,7 +22,9 @@ using namespace std;
 #define BUFLEN 2048 //Max length of buffer
 #define IN_PORT 5000 
 #define OUT_PORT 7000
-#define TIMEOUT 1
+#define TIMEOUT_SECS 0
+#define TIMEOUT_MASECS 500000
+#define MAX_WAIT 2
 
 class Client {
 
@@ -41,7 +43,7 @@ class Client {
 		int messageType;
 		int SYN;
 		int ACK;
-		int sequenceBit;
+		int sequence;
 		int finalBit;
 		int errorBit;
 		int testBit;
@@ -59,6 +61,10 @@ class Client {
 		void sendPackets(vector<message> msgV, int numberOfPackets, int windowSize, int timeout);
 	private:
 		void send(char * buffer);
+		void deliverFile(struct message *m);
+		void deliverFile();
+		char * reliableSend(char * buffer, int sequence);
+		char * reliableSend(char * buffer);
 		int getRandomNumber();
 		int handshake();
 		int validateSequence(int remoteSeq);

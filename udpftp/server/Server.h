@@ -6,6 +6,7 @@
 #include <string>
 #include <stdio.h>;
 #include <ctime>;
+#include <vector>;
 #include "dirent\dirent.h"
 #include "Log.h";
 
@@ -15,7 +16,9 @@
 #define IN_PORT 5001 
 #define OUT_PORT 7001
 #define SERVER "127.0.0.1"  //ip address of udp server
-#define TIMEOUT 1
+#define TIMEOUT_SECS 0
+#define TIMEOUT_MASECS 50000
+#define MAX_WAIT 2;
 
 class Server {
 	SOCKET s;
@@ -32,7 +35,7 @@ class Server {
 		int messageType;
 		int SYN;
 		int ACK;
-		int sequenceBit;
+		int sequence;
 		int finalBit;
 		int errorBit;
 		int testBit;
@@ -49,12 +52,12 @@ class Server {
 	private:
 
 		struct message * getDataFromClient(char *serverBuf);
-		int handshake();
+		int handshake(char * buf);
 		int getRandomNumber();
 		void send(char * buffer);
 		void list(int sequence);
 		int validateSequence(int remoteSeq);
 		void increaseSequence();
-		void get(struct message * msg);
+		void get(std::string filename, int sequence);
 		void put(struct message * msg);
 };

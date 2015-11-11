@@ -47,59 +47,31 @@ void Server::start() {
 
 
 	logger.log("Server:  Server started and waiting...\n");
-	cout << "Server ready and waiting...\n";
 	//keep listening for data
 	char serverBuf[BUFLEN];
 	int count = 1;
-	//while (1)
-	//{
-	//	// testing
-	//	if ((recv_len = recvfrom(s, serverBuf, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
-	//	{
-	//		cout << WSAGetLastError();
-	//		cout << "Server error\n";
-	//		logger.log("Server:  Error in recieving packet\n");
-	//		exit(EXIT_FAILURE);
-	//	}
-	//	else {
-	//		struct message *msg = (struct message *) serverBuf;
-	//		if (msg->testBit == 1) {
-	//			cout << "Packet with test bit set received\n";
-	//			if (count > 0) {
-	//				char buffer[BUFLEN];
-	//				memset(buffer, '\0', BUFLEN);
-	//				struct message *res = (struct message *) buffer;
-	//				res->testBit = count;
-	//				res->testNum = msg->testNum;
-	//				cout << "Sending test response with testNum = " << msg->testNum << "\n";
-	//				send(buffer);
-	//			}
-	//			else {
-	//				cout << "Not sending response because im mean\n";
-	//			}
-	//			count += 1;
-	//		}
-	//		else {
-	//			cout << "Packet with test bit not set received\n";
-	//		}
-	//	}
-	////	exit(0);
-	//	// END TEST
-	//}
+	
 	while(1) {
+		cout << "Server ready and waiting\n";
 		struct message * msg = getDataFromClient(serverBuf);
+		cout << "SEQ?>>? " << msg->sequence << "\n";
+		cout << "MESSAGE TYPE IS " << msg->messageType << "\n";
+		int seq = msg->sequence;
+		string filename;
 		switch (msg->messageType) {
 			case 0:
 				// List operation
 				logger.log("Server:  List operation called...\n");
 				cout << "LIST\n";
-				list(msg->sequenceBit);
+				list(seq);
 				break;
 			case 1:
 				// Get operation
+				filename = msg->body;
+				cout << "BODY : " << filename << "\n";
 				logger.log("Server:  Get operation called...\n");
 				cout << "GET\n";
-				get(msg);
+				get(filename, seq);
 				break;
 			case 4:
 				// Put operation
@@ -114,7 +86,7 @@ void Server::start() {
 
 }
 
-int Server::handshake() {
+int Server::handshake(char * fillMe) {
 	// Get SYN
 	char buffer[BUFLEN];
 	int syn = -1;
@@ -150,42 +122,79 @@ int Server::handshake() {
 				exit(-1);
 			}
 			if (rec_msg->ACK == ack) {
-				logger.log("Server:  Recieved correct ACK of ");
+				logger.log("Server:  Received correct ACK of ");
 				logger.log(rec_msg->ACK);
 				logger.log(" from client\n");
 				char nextBuffer[BUFLEN];
 				struct message *res = (struct message *) nextBuffer;
 				// Send empty buffer to close loop
+				res->SYN = -1;
+				res->ACK = -1;
+				logger.log("Server:  Sending last packet of empty SYN and ACK\n");
 				send(nextBuffer);
+
+
 				fd_set rfds;
 				struct timeval tv;
 				int retval;
-				tv.tv_sec = TIMEOUT;
-				tv.tv_usec = 0;
+				tv.tv_sec = TIMEOUT_SECS + MAX_WAIT;
+				tv.tv_usec = TIMEOUT_MASECS * 2;
 
-				FD_ZERO(&rfds);
-				FD_SET(s, &rfds);
-				retval = select(1, &rfds, NULL, NULL, &tv);
-				if (retval == -1) {
-					cout << "Error in select\n";
-					logger.log("Server:  Error in select, exiting\n");
-					exit(-1);
+
+				while (true) {
+
+					FD_ZERO(&rfds);
+					FD_SET(s, &rfds);
+					retval = select(1, &rfds, NULL, NULL, &tv);
+					if (retval == -1) {
+						cout << "Error in select\n";
+						logger.log("Server:  Error in select, exiting\n");
+						exit(-1);
+					}
+
+					if (!retval) {
+						logger.log("Server:  No more handshakes arriving from client. Handshake success!\n");
+						cout << "Handdshake completed 1\n";
+						return 0;
+					}
+					if (retval) {
+						char buffer[BUFLEN];
+						recv_len = recvfrom(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen);
+						struct message * m = (struct message *) buffer;
+						if (m->messageType >= 0) {
+							cout << "Handshake completed 2\n";
+							memcpy(fillMe, buffer, BUFLEN);
+							logger.log("Server:  Client has send a message with a message type, indicating the client moved on from handshake. Handshae success\n");
+							return 1;
+						}
+						cout << "Recevied unexpeccted packet, wait for a timeout\n";
+						logger.log("Server:  Received unexpected packet, client is still sending, wait until a timeout\n");
+						char nextBuffer[BUFLEN];
+						struct message *res = (struct message *) nextBuffer;
+						// Send empty buffer to close loop
+						res->SYN = -1;
+						res->ACK = -1;
+						send(nextBuffer);
+					}
 				}
-				if (!retval) {
-					logger.log("Server:  No more handshakes arriving from client. Handshake success!\n");
-					cout << "Handdshake completed\n";
-					return 0;
-				}
-				else {
-					// Crap, client must not have got our last message, oh well, onwards we march
-					// Send one last time, otherwise we'll let client figure out connection is dead
-					send(nextBuffer);
-					cout << "Handdshake completed\n";
-					return 0;
-				}
+
 			}
 		}
+		else {
+			char failBuffer[BUFLEN];
+			// I dont even know who you are
+			cout << "Unknown packet in handshake, has no syn or ack and its sequence is " << rec_msg->sequence << " and message type is " << rec_msg->messageType << "\n";
+			logger.log("Server:  Received unknown message in handshake.  Sending back empty response\n");
+			
+		//	if (rec_msg->sequence >= 0 && rec_msg->sequence >= 0) {
+		//		cout << "THere - weird, a sequence is set - lets send upwards\n";
+		//		memcpy(fillMe, buffer, BUFLEN);
+		//		return 1;
+		//	}
 
+			send(failBuffer);
+			return -1;
+		}
 
 	}
 
@@ -205,25 +214,49 @@ void Server::send(char * buffer) {
 
 
 Server::message * Server::getDataFromClient(char *serverBuf) {
-	seq = handshake();
-	exit(-2);
-	if ((recv_len = recvfrom(s, serverBuf, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
-	{
-		cout << "Error in recvform";
-		logger.log("Server:  Failed to recieve data from client");
-		exit(EXIT_FAILURE);
+	char fillMe[BUFLEN];
+	int handshakeRes = handshake(fillMe);
+	if (handshakeRes == -1) {
+		logger.log("Server:  No response from handshake, going back into wait mode\n");
+		struct message * empty = (struct message *) serverBuf;
+		empty->messageType = -1;
+		return empty;
 	}
-	else {
-		cout << "Incoming data\n";
-		logger.log("Server:  Incoming data from client...\n");
-		struct message *resmsg = (struct message *) serverBuf;
-		return resmsg;
+	else if (handshakeRes == 1) {
+		cout << "HELP ME\n";
+		struct message * m = (struct message *) fillMe;
+		cout << "SEQ: " << m->sequence << "\n";
+		if (m->sequence >= 0) {
+			return m;
+		}
 	}
+
+
+	int messageType = -1;
+	struct message *resmsg;
+	while (messageType < 0) {
+		if ((recv_len = recvfrom(s, serverBuf, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+		{
+			cout << "Error in recvform";
+			logger.log("Server:  Failed to recieve data from client");
+			exit(EXIT_FAILURE);
+		}
+		else {
+			resmsg = (struct message *) serverBuf;
+			cout << "Received data";
+			cout << resmsg->messageType << "\n";
+			messageType = resmsg->messageType;
+		}
+	}
+	cout << "Incoming data\n";
+	logger.log("Server:  Incoming data from client...\n");
+
+	return resmsg;
 	
 }
 
-void Server::list(int incomingSeq) {
-	validateSequence(incomingSeq);
+void Server::list(int sequence) {
+	cout << "LIST SEQ " << sequence << "\n";
 	string output = "";
 	DIR *dir;
 	struct dirent *ent;
@@ -248,8 +281,7 @@ void Server::list(int incomingSeq) {
 	// TODO we assume 1 packet size for list
 	char sendBuffer[BUFLEN];
 	struct message * sendMsg = (struct message *) sendBuffer;
-	sendMsg->sequenceBit = seq;
-	increaseSequence();
+	sendMsg->sequence = sequence;
 	if (output.length() >= BODYLEN) {
 		logger.log("Server:  Unable to send file listing, listing is too large");
 		sendMsg->errorBit = 1;
@@ -257,15 +289,54 @@ void Server::list(int incomingSeq) {
 		exit(EXIT_FAILURE);
 	}
 	strcpy_s(sendMsg->body, output.c_str());
-	send(sendBuffer);
-	logger.log("Server:  List of files send to client\n");
+
+	while (1) {
+		struct message * sendMsg = (struct message *) sendBuffer;
+		sendMsg->sequence = sequence;
+		if (output.length() >= BODYLEN) {
+			logger.log("Server:  Unable to send file listing, listing is too large");
+			sendMsg->errorBit = 1;
+			send(sendBuffer);
+			exit(EXIT_FAILURE);
+		}
+		strcpy_s(sendMsg->body, output.c_str());
+		cout << "Sending list\n";
+		cout << sequence << "\n";
+		send(sendBuffer);
+		logger.log("Server:  List of files sent to client\n");
+
+		char resBuffer[BUFLEN];
+		if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+		{
+			logger.log("Server:  Error recieving data from client");
+			cout << "Error receiving data";
+			exit(EXIT_FAILURE);
+		}
+		struct message * resMsg = (struct message *) resBuffer;
+		if (resMsg->messageType < 0) {
+			// Client has given us permission to exit list
+			cout << "List complete\n";
+			logger.log("Server:  Received end packet from client.  Exiting list loop\n");
+			break;
+		}
+		else {
+			logger.log("Server:  Received non-end packet from client.  Resending list\n");
+		}
+	}
 }
 
-void Server::get(struct message * msg) {
-	validateSequence(msg->sequenceBit);
-	string filename = msg->body;
+void Server::get(std::string filename, int sequence) {
+	cout << "Get called with sequence " << sequence << "\n";
+	cout << "BODY 2" << filename << "\n";
+	// let client know we are about to send a file
+	char buffer[BUFLEN];
+	struct message * resMsg = (struct message *) buffer;
 
+	resMsg->sequence = sequence;
+	send(buffer);
+	cout << "I sent pack the acknoledgment that i know what file ur looking for\n";
 
+	// now send the file
 	logger.log("Server:  Looking for file: ");
 	logger.log("Filename: ");
 	char why[BODYLEN];
@@ -275,71 +346,127 @@ void Server::get(struct message * msg) {
 
 	ifstream fileToRead;
 	fileToRead.open(filename, ios::in | ios::binary);
+
+	
 	if (fileToRead.is_open())
 	{
 		// Can make this a bit better
 		// Count how many packets there will be
-		char fakeBuf[BODYLEN];
+		char fileBuf[BODYLEN];
 		int numPackets = 0;
 		while (!fileToRead.eof()) {
-			memset(fakeBuf, '\0', BODYLEN);
+			memset(fileBuf, '\0', BODYLEN);
 			numPackets += 1;
-			fileToRead.read(fakeBuf, BODYLEN);
+			fileToRead.read(fileBuf, BODYLEN);
 		}
-		logger.log("Server:  Sending ");
-		logger.log(numPackets);
-		logger.log(" packets to server\n");
 
 		fileToRead.clear();
 		fileToRead.seekg(0, ios::beg);
-		int packetCount = 1;
 
-		char buf[BUFLEN];
-		
-		while (!fileToRead.eof())
-		{
+		vector<string> msgV(numPackets);
+		int i = 0;
+		while (!fileToRead.eof()) {
+			string data;
+			char buf[BODYLEN];
 			memset(buf, '\0', BODYLEN);
+			fileToRead.read(buf, BODYLEN);
+			data = buf;
+			char b[BODYLEN];
+//			strcpy_s(b, data.c_str());
 
+			msgV.at(i) = data;
 
-			struct message * sendMsg = (struct message *) buf;
-			sendMsg->sequenceBit = seq;
-			increaseSequence();
-
-			/* Read the contents of file and write into the buffer for transmission */
-			fileToRead.read(sendMsg->body, BODYLEN);
-
-			if (packetCount == numPackets) {
-				logger.log("Server:  Last packet, setting final bit\n");
-				sendMsg->finalBit = 1;
-			}
-			else {
-				sendMsg->finalBit = 0;
-			}
-
-			send(buf);
-			logger.log("Server:  Sending file packet\n");
-			packetCount += 1;
+			i += 1;
 		}
-		cout << "File transfer complete\n";
-		logger.log("Server:  File transfer complete\n");
+
+
+		logger.log("Server:  Sending ");
+		logger.log(numPackets);
+		logger.log(" packets to server\n");
+		for (i = 0; i < msgV.size(); ++i) {
+			string data = msgV.at(i);
+
+			char b[BODYLEN];
+			strncpy_s(b, data.c_str(), _TRUNCATE);
+			cout << b << "__END__";
+			
+			
+			char buffer[BUFLEN];
+			struct message * m = (struct message *) buffer;
+			sequence += 1;
+			m->sequence = sequence;
+			m->body[BODYLEN];
+			strncpy_s(m->body, data.c_str(), _TRUNCATE);
+			send(buffer);
+		}
+		cout << "DONE FILE\n";
+
 	}
-	else
-	{
-		char buf[BUFLEN];
-		struct message * sendMsg = (struct message *) buf;
-		sendMsg->sequenceBit = seq;
-		increaseSequence();
-		sendMsg->errorBit = 1;
-		logger.log("Server:  Unable to find file\n");
-		cout << "Unable to find file\n";
-		strcpy_s(sendMsg->body, "File was not found");
-		send(buf);
-	}
-	fileToRead.close();
+	
+
+
+
+	/*fd_set rfds;
+	struct timeval tv;
+	int retval;
+	tv.tv_sec = TIMEOUT_SECS + MAX_WAIT;
+	tv.tv_usec = TIMEOUT_MASECS * 2;
+	while (true) {
+
+		FD_ZERO(&rfds);
+		FD_SET(s, &rfds);
+		retval = select(1, &rfds, NULL, NULL, &tv);
+	*/
+	
+	
+	//string filename = msg->body;
+
+
+	//	int packetCount = 1;
+
+	//	char buf[BUFLEN];
+	//	
+	//	while (!fileToRead.eof())
+	//	{
+	//		memset(buf, '\0', BODYLEN);
+
+
+	//		struct message * sendMsg = (struct message *) buf;
+	//		increaseSequence();
+
+	//		/* Read the contents of file and write into the buffer for transmission */
+	//		fileToRead.read(sendMsg->body, BODYLEN);
+
+	//		if (packetCount == numPackets) {
+	//			logger.log("Server:  Last packet, setting final bit\n");
+	//			sendMsg->finalBit = 1;
+	//		}
+	//		else {
+	//			sendMsg->finalBit = 0;
+	//		}
+
+	//		send(buf);
+	//		logger.log("Server:  Sending file packet\n");
+	//		packetCount += 1;
+	//	}
+	//	cout << "File transfer complete\n";
+	//	logger.log("Server:  File transfer complete\n");
+	//}
+	//else
+	//{
+	//	char buf[BUFLEN];
+	//	struct message * sendMsg = (struct message *) buf;
+	//	increaseSequence();
+	//	sendMsg->errorBit = 1;
+	//	logger.log("Server:  Unable to find file\n");
+	//	cout << "Unable to find file\n";
+	//	strcpy_s(sendMsg->body, "File was not found");
+	//	send(buf);
+	//}
+	//fileToRead.close();
 }
 
 void Server::put(struct message * msg) {
-	validateSequence(msg->sequenceBit);
 	
 	string filename = msg->body;
 
@@ -356,7 +483,6 @@ void Server::put(struct message * msg) {
 		}
 		else {
 			struct message *resMsg = (struct message *) resBuffer;
-			validateSequence(resMsg->sequenceBit);
 			
 			outFile.write(resMsg->body, BODYLEN);
 			if (resMsg->finalBit == 1) {
