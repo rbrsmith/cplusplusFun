@@ -19,6 +19,7 @@
 #define TIMEOUT_SECS 0
 #define TIMEOUT_MASECS 50000
 #define MAX_WAIT 2;
+#define WINDOW_SIZE 5;
 
 class Server {
 	SOCKET s;
@@ -40,6 +41,7 @@ class Server {
 		int errorBit;
 		int testBit;
 		int testNum;
+		int numPackets;
 		char body[BODYLEN];
 	};
 	int bufLen = sizeof(message);

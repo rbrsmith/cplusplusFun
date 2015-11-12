@@ -2,6 +2,10 @@
 #include "Client.h";
 
 
+// BUGS
+// error in hs
+// Error in wrong num packets received
+
 Client::Client() {
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 	{
@@ -606,12 +610,13 @@ void Client::getFile(string filename) {
 			cout << resMsg->sequence << "\n";
 			if (resMsg->sequence == seq) {
 				cout << "Got sequence back from server, ready to start receiving files\n";
-				deliverFile();
+				deliverFile(seq, filename);
 				break;
 			}
 			else if (resMsg->sequence > seq) {
 				cout << "OH SHIT, server is already sending us files, get ready to recceive and this is the first paccket\n";
-				deliverFile(resMsg);
+				// we drop that first packet cause we're naughty like that
+				deliverFile(seq, filename);
 				break;
 			}
 			else {
@@ -674,13 +679,106 @@ void Client::getFile(string filename) {
 */
 }
 
-void Client::deliverFile(struct message * firstMsg) {
-	cout << "READY WITH FIRST PACKET SIR\n";
-	cout << firstMsg->body;
-}
 
-void Client::deliverFile() {
+void Client::deliverFile(int sequence, string filename) {
 	cout << "READY WITH NO PACKET SIR\n";
+	vector<string> receivedPackets(0);
+	vector<char *> receivedPackets2(0);
+	while (true) {
+		char buffer[BUFLEN];
+		if ((recv_len = recvfrom(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+		{
+			logger.log("Client:  recvfrom() failed\n");
+			exit(EXIT_FAILURE);
+		}
+		// get message
+		struct message * msg = (struct message *) buffer;
+		if (msg->finalBit == 1) {
+			cout << "Recieved final bit\n";
+			char finalBuf[BUFLEN];
+			struct message * finalMsg = (struct message *) finalBuf;
+			finalMsg->sequence = msg->sequence;
+			memset(buffer, '/0', BUFLEN);
+			char * buffer = reliableSend(finalBuf);
+			reliableSend(buffer);
+			break;
+		}
+		if (msg->sequence < sequence) {
+			cout << "Da fuck is this\n";
+			cout << "sequence is " << msg->sequence << "\n";
+			exit(-1);
+		}
+		if (msg->numPackets < 0) {
+			cout << "Error in num packets\n";
+			// Somethings wrong, if numpackets aren't sent, we're not in right mode
+			char errorBuf[BUFLEN];
+			struct message * errorMsg = (struct message *) errorBuf;
+			
+			reliableSend(errorBuf);
+
+			continue;
+		}
+		if (receivedPackets.size() < msg->numPackets) {
+			cout << "resizing packets";
+			receivedPackets.resize(msg->numPackets);
+			receivedPackets2.resize(msg->numPackets);
+			for (int i = 0; i < receivedPackets.size(); i++) {
+				receivedPackets.at(i) = -1;
+			}
+		}
+		cout << "RECEIVED PACKET\n";
+		char resBuffer[BUFLEN];
+		struct message * resMsg = (struct message *) resBuffer;
+		resMsg->sequence = msg->sequence;
+		int actualSequence = msg->sequence - sequence - 1;
+		cout << "actual seq: " << actualSequence << "\n";
+		if (actualSequence < 0) {
+			cout << "Actual sequence is below 0 ... continuing\n";
+			continue;
+		}
+		string data = msg->body;
+		receivedPackets.at(actualSequence) = data;
+		char * newBuf = new char[BODYLEN];
+		memcpy(newBuf, msg->body, BODYLEN);
+		receivedPackets2.at(actualSequence) = newBuf;
+		cout << data << "--END--";
+//		for (int i = 0; i < receivedPackets.size(); ++i) {
+//			cout << receivedPackets.at(i) << "--END--";
+//		}
+//		cout << "~~~DONE~~~\n\n";
+		cout << "SENDING RES MSG WITH SEQ " << resMsg->sequence << "\n";
+		send(resBuffer);
+
+
+
+	}
+	cout << "DO WT YOU WANT WITH MY BODY\n";
+	ofstream outFile(filename, ios::out | ios::binary);
+	for (int i = 0; i < receivedPackets.size(); ++i)
+	{
+//		char data[BODYLEN];
+//		string str = receivedPackets.at(i);
+
+//		strncpy_s(data, str.c_str(), BODYLEN);
+
+//		char *arr_ptr = &data[0];
+//		int len = strlen(arr_ptr);
+
+
+
+		char b[BODYLEN];
+		memcpy(b, receivedPackets2.at(i), BODYLEN-1);
+		outFile.write(b, BODYLEN - 1);
+		memset(b, '/0', BODYLEN);
+
+
+
+//		outFile.write(str.c_str(), len);
+		
+//		memset(data, '\0', BODYLEN);
+	//	cout << receivedPackets.at(i);
+	}
+	outFile.close();
 
 }
 

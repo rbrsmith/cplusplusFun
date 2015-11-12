@@ -25,6 +25,7 @@ using namespace std;
 #define TIMEOUT_SECS 0
 #define TIMEOUT_MASECS 500000
 #define MAX_WAIT 2
+#define WINDOW_SIZE 5;
 
 class Client {
 
@@ -48,6 +49,7 @@ class Client {
 		int errorBit;
 		int testBit;
 		int testNum;
+		int numPackets;
 		char body[BODYLEN];
 	};
 		
@@ -61,8 +63,7 @@ class Client {
 		void sendPackets(vector<message> msgV, int numberOfPackets, int windowSize, int timeout);
 	private:
 		void send(char * buffer);
-		void deliverFile(struct message *m);
-		void deliverFile();
+		void deliverFile(int sequence, string filename);
 		char * reliableSend(char * buffer, int sequence);
 		char * reliableSend(char * buffer);
 		int getRandomNumber();

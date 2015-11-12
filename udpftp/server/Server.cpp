@@ -326,6 +326,7 @@ void Server::list(int sequence) {
 }
 
 void Server::get(std::string filename, int sequence) {
+	int original_sequence = sequence;
 	cout << "Get called with sequence " << sequence << "\n";
 	cout << "BODY 2" << filename << "\n";
 	// let client know we are about to send a file
@@ -334,8 +335,7 @@ void Server::get(std::string filename, int sequence) {
 
 	resMsg->sequence = sequence;
 	send(buffer);
-	cout << "I sent pack the acknoledgment that i know what file ur looking for\n";
-
+	
 	// now send the file
 	logger.log("Server:  Looking for file: ");
 	logger.log("Filename: ");
@@ -347,62 +347,253 @@ void Server::get(std::string filename, int sequence) {
 	ifstream fileToRead;
 	fileToRead.open(filename, ios::in | ios::binary);
 
-	
+
+	vector<string> msgV(0);
+	vector<char *>msgV2(0);
+	int numPackets = 0;
 	if (fileToRead.is_open())
 	{
 		// Can make this a bit better
 		// Count how many packets there will be
 		char fileBuf[BODYLEN];
-		int numPackets = 0;
 		while (!fileToRead.eof()) {
 			memset(fileBuf, '\0', BODYLEN);
 			numPackets += 1;
 			fileToRead.read(fileBuf, BODYLEN);
 		}
+		int ws = WINDOW_SIZE;
+		cout << "\nTHERE WILL BE " << numPackets << " SENT\n";
+		cout << "WINDOW SIZE IS " << ws << "\n\n";
+
 
 		fileToRead.clear();
 		fileToRead.seekg(0, ios::beg);
 
-		vector<string> msgV(numPackets);
+		msgV.resize(numPackets);
+		msgV2.resize(numPackets);
 		int i = 0;
+		char buf[BODYLEN];
 		while (!fileToRead.eof()) {
 			string data;
-			char buf[BODYLEN];
 			memset(buf, '\0', BODYLEN);
-			fileToRead.read(buf, BODYLEN);
+			// minus one for the null character
+			fileToRead.read(buf, BODYLEN-1);
 			data = buf;
-			char b[BODYLEN];
-//			strcpy_s(b, data.c_str());
 
 			msgV.at(i) = data;
 
+			char * newBuf = new char[BODYLEN];
+			memcpy(newBuf, buf, BODYLEN-1);
+			msgV2.at(i) = newBuf;
+
 			i += 1;
+
 		}
 
-
-		logger.log("Server:  Sending ");
-		logger.log(numPackets);
-		logger.log(" packets to server\n");
-		for (i = 0; i < msgV.size(); ++i) {
-			string data = msgV.at(i);
-
-			char b[BODYLEN];
-			strncpy_s(b, data.c_str(), _TRUNCATE);
-			cout << b << "__END__";
-			
-			
-			char buffer[BUFLEN];
-			struct message * m = (struct message *) buffer;
-			sequence += 1;
-			m->sequence = sequence;
-			m->body[BODYLEN];
-			strncpy_s(m->body, data.c_str(), _TRUNCATE);
-			send(buffer);
+		// TEST
+		ofstream outFile("TEST3.pdf", ios::out | ios::binary);
+		for (int i = 0; i < numPackets; ++i) {
+			cout << msgV2.at(i);
+			char b[BODYLEN-1];
+			memcpy(b, msgV2.at(i), BODYLEN-1);
+			outFile.write(b, BODYLEN-1);
+			memset(b, '/0', BODYLEN - 1);
 		}
-		cout << "DONE FILE\n";
+		outFile.close();
+		// END TEST
+
+
+		// So we are now ready to send our file, all of it stored in msgV
+
+
 
 	}
+	fileToRead.close();
+
+
+	// Send 5 first packets
+
+	time_t  timev;
+	// We wait for response
+	vector<int> timeSend(numPackets);
+	vector<int> sequenceNumbers(numPackets);
+	for (int i = 0; i < numPackets; ++i) {
+		timeSend.at(i) = -1;
+		sequenceNumbers.at(i) = -1;
+	}
+	int window_size = WINDOW_SIZE;
+	int packetsEnRoute = 0;
+	for (int i = 0; i < window_size; ++i) {
+		if (i >= numPackets) {
+			break;
+		}
+		string data = msgV.at(i);
+		char b[BODYLEN];
+		strncpy_s(b, data.c_str(), BODYLEN);
+
+		char buffer[BUFLEN];
+		struct message * m = (struct message *) buffer;
+		sequence += 1;
+		m->sequence = sequence;
+		m->numPackets = numPackets;
+		m->body[BODYLEN];
+//		strncpy_s(m->body, data.c_str(), _TRUNCATE);
+
+		// HIPPO
+		memcpy(m->body, msgV2.at(i), BODYLEN - 1);
+
+
+		time(&timev);
+		timeSend.at(i) = timev;
+		sequenceNumbers.at(i) = sequence;
+		cout << "Sent " << i << " with sequence " << sequence << "\n";
+		send(buffer);
+		packetsEnRoute += 1;
+	}
+
+	fd_set rfds;
+	struct timeval tv;
 	
+	tv.tv_sec = TIMEOUT_SECS;
+	tv.tv_usec = TIMEOUT_MASECS;
+	int retval;
+	while (1) {
+		FD_ZERO(&rfds);
+		FD_SET(s, &rfds);
+		retval = select(1, &rfds, NULL, NULL, &tv);
+		if (retval == -1) {
+			cout << "Goddamn error in select\n";
+			exit(-1);
+		} 
+		if (!retval) {
+			cout << "Timeout occured\n";
+			time_t time_now;
+			time(&time_now);
+			for (int i = 0; i < numPackets; ++i) {
+				if (timeSend.at(i) != -1 && timeSend.at(i) != 0 && timeSend.at(i) < time_now) {
+					// resend
+					char resendBuf[BUFLEN];
+					struct message * resendMsg = (struct message *) resendBuf;
+					int s = sequenceNumbers.at(i);
+					resendMsg->sequence = s;
+					string data = msgV.at(i);
+
+			//		strncpy_s(resendMsg->body, data.c_str(), _TRUNCATE);
+					//HIPPO
+					memcpy(resendMsg->body, msgV2.at(i), BODYLEN - 1);
+
+					resendMsg->numPackets = numPackets;
+					cout << "Resent " << i << " with sequence " << resendMsg->sequence << "\n";
+					time(&timev);
+					timeSend.at(i) = timev;
+					send(resendBuf);
+				}
+			}
+
+		}
+		else {
+			char successBuf[BUFLEN];
+			if ((recv_len = recvfrom(s, successBuf, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+			{
+				logger.log("Client:  recvfrom() failed\n");
+				exit(EXIT_FAILURE);
+			}
+			struct message * sucMsg = (struct message *) successBuf;
+			// find who we are getting res for
+			for (int i = 0; i < numPackets; ++i) {
+				if (sequenceNumbers.at(i) == sucMsg->sequence) {
+					// hazaa - only if its not already acked
+					if (timeSend.at(i) != 0) {
+						cout << "Received acknowledgement of " << i << " with sequence " << sucMsg->sequence << "\n";
+						timeSend.at(i) = 0;
+						packetsEnRoute -= 1;
+						break;
+					}
+				}
+			}
+			
+			// find next guy to send
+			int sent = 0;
+			// see if we can even send any
+			if(packetsEnRoute < window_size) {
+				for (int i = 0; i < numPackets; ++i) {
+					if (timeSend.at(i) == -1) {
+						// found our chap
+						char nextSeq[BUFLEN];
+						struct message * nextMsg = (struct message *) nextSeq;
+						sequence += 1;
+						nextMsg->sequence = sequence;
+						sequenceNumbers.at(i) = sequence;
+						string data = msgV.at(i);
+					//	strncpy_s(nextMsg->body, data.c_str(), _TRUNCATE);
+						
+						//HIPPO
+						memcpy(nextMsg->body, msgV2.at(i), BODYLEN - 1);
+						
+						nextMsg->numPackets = numPackets;
+
+						time_t t;
+						time(&t);
+						timeSend.at(i) = t;
+						cout << "Sending next packet of " << i << " with sequence " << sequence << "\n";
+						send(nextSeq);
+						packetsEnRoute += 1;
+						break;
+					}
+					else if (timeSend.at(i) == 0) {
+						sent += 1;
+					}
+				}
+			}
+			if (sent == numPackets) {
+				// We found nobody
+				cout << "All packets sent\n";
+				break;
+			}
+		}
+
+
+
+	}
+
+	// Send final packet
+	seq = sequence += 100;
+	
+	char finalBuf[BUFLEN];
+	struct message * finalMsg = (struct message *) finalBuf;
+	
+	while (true) {
+		finalMsg->finalBit = 1;
+		finalMsg->sequence = seq;
+		cout << "Sending final packet\n";
+		send(finalBuf);
+		FD_ZERO(&rfds);
+		FD_SET(s, &rfds);
+		retval = select(1, &rfds, NULL, NULL, &tv);
+		if (retval == -1) {
+			cout << "error in select";
+			exit(-1);
+		}
+		if (!retval) {
+			continue;
+		}
+		else {
+			char finRecBuf[BUFLEN];
+			if ((recv_len = recvfrom(s, finRecBuf, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
+			{
+				logger.log("Client:  recvfrom() failed\n");
+				exit(EXIT_FAILURE);
+			}
+			struct message * finalRecMsg = (struct message *) finRecBuf;
+			if (finalRecMsg->sequence == seq) {
+				cout << "Client has acknowledge our final packet\n";
+				return;
+			}
+			else {
+				continue;
+			}
+		}
+	}
 
 
 
@@ -411,11 +602,7 @@ void Server::get(std::string filename, int sequence) {
 	int retval;
 	tv.tv_sec = TIMEOUT_SECS + MAX_WAIT;
 	tv.tv_usec = TIMEOUT_MASECS * 2;
-	while (true) {
-
-		FD_ZERO(&rfds);
-		FD_SET(s, &rfds);
-		retval = select(1, &rfds, NULL, NULL, &tv);
+	
 	*/
 	
 	
