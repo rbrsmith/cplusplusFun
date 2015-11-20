@@ -52,22 +52,19 @@ class Client {
 		int numPackets;
 		char body[BODYLEN];
 	};
-		
-	public:
-		Client();
-		void printRemoteList();
-		void getFile(string filename);
-		void printLocalList();
-		void sendFile(string filename);
-		void test();
-		void sendPackets(vector<message> msgV, int numberOfPackets, int windowSize, int timeout);
-	private:
-		void send(char * buffer);
-		void deliverFile(int sequence, string filename);
-		char * reliableSend(char * buffer, int sequence);
-		char * reliableSend(char * buffer);
-		int getRandomNumber();
-		int handshake();
-		int validateSequence(int remoteSeq);
-		void increaseSequence();
+
+public:
+	Client();
+	void printRemoteList();
+	void getFile(string filename);
+	void printLocalList();
+	void sendFile(string filename);
+	void sendPackets(vector<message> msgV, int numberOfPackets, int windowSize, int timeout);
+private:
+	void send(char * buffer);
+	void deliverFile(int sequence, string filename);
+	char * reliableSend(char * buffer, int sequence);
+	char * reliableSend(char * buffer);
+	int getRandomNumber();
+	int handshake();
 };

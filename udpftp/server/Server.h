@@ -47,19 +47,22 @@ class Server {
 	int bufLen = sizeof(message);
 
 
-	
 
-	public:
-		void start();
-	private:
 
-		struct message * getDataFromClient(char *serverBuf);
-		int handshake(char * buf);
-		int getRandomNumber();
-		void send(char * buffer);
-		void list(int sequence);
-		int validateSequence(int remoteSeq);
-		void increaseSequence();
-		void get(std::string filename, int sequence);
-		void put(struct message * msg);
+public:
+	void start();
+private:
+
+	struct message * getDataFromClient(char *serverBuf);
+	int handshake(char * buf);
+	int getRandomNumber();
+	void send(char * buffer);
+	void list(int sequence);
+	int validateSequence(int remoteSeq);
+	void increaseSequence();
+	void get(std::string filename, int sequence);
+	void put(std::string filename, int sequence);
+	void deliver(std::string filename, int sequence);
+	char * reliableSend(char * buffer, int sequence);
+	char * reliableSend(char * buffer);
 };
