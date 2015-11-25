@@ -13,43 +13,39 @@ int main() {
 		cout << "\n--------------------\nChoice: ";
 		cin >> choice;
 		switch (choice) {
-			case 1:
-			{
-				client.printRemoteList();
-				break;
-			}
-			case 2:
-			{	
-				client.printRemoteList();
-				cout << "\nEnter filename to retreive: ";
-				string filename;
-				cin >> filename;
-				cin.clear();
-				client.getFile(filename);
-				break;
-			}
-			case 3:
-			{
-				client.printLocalList();
-				break;
-			}
-			case 4:
-			{
-				client.printLocalList();
-				cout << "\nEnter filename to send: ";
-				string filename;
-				cin >> filename;
-				cin.clear();
-				client.sendFile(filename);
-				break;
-			}
-			case 5: 
-			{
-				client.test();
-			}
+		case 1:
+		{
+			client.printRemoteList();
+			break;
+		}
+		case 2:
+		{
+			client.printRemoteList();
+			cout << "\nEnter filename to retreive: ";
+			string filename;
+			cin >> filename;
+			cin.clear();
+			client.getFile(filename);
+			break;
+		}
+		case 3:
+		{
+			client.printLocalList();
+			break;
+		}
+		case 4:
+		{
+			client.printLocalList();
+			cout << "\nEnter filename to send: ";
+			string filename;
+			cin >> filename;
+			cin.clear();
+			client.sendFile(filename);
+			break;
+		}
 		}
 
-		
+
 	}
 
 }

@@ -4,7 +4,9 @@
 using namespace std;
 
 
-
+/**
+ * Star the server in a forever loop listening for incoming packets
+ */
 void Server::start() {
 
 	logger.log("\nServer:  New Server instance started...\n");
@@ -39,12 +41,10 @@ void Server::start() {
 	}
 
 
-
 	memset((char *)&si_out, 0, sizeof(si_out));
 	si_out.sin_family = AF_INET;
 	si_out.sin_port = htons(OUT_PORT);
 	si_out.sin_addr.S_un.S_addr = inet_addr(SERVER);
-
 
 	logger.log("Server:  Server started and waiting...\n");
 	//keep listening for data
@@ -81,9 +81,12 @@ void Server::start() {
 		logger.log("Server:  Server:  Waiting for request...\n");
 	}
 
-
 }
 
+/**
+ * Perform handshake
+ * Take a packet to be filled with handshake response
+ */
 int Server::handshake(char * fillMe) {
 	// Get SYN
 	char buffer[BUFLEN];
@@ -130,7 +133,6 @@ int Server::handshake(char * fillMe) {
 				res->ACK = -1;
 				logger.log("Server:  Sending last packet of empty SYN and ACK\n");
 				send(nextBuffer);
-
 
 				fd_set rfds;
 				struct timeval tv;
@@ -179,14 +181,7 @@ int Server::handshake(char * fillMe) {
 		}
 		else {
 			char failBuffer[BUFLEN];
-			// I dont even know who you are
 			logger.log("Server:  Received unknown message in handshake.  Sending back empty response\n");
-
-			//	if (rec_msg->sequence >= 0 && rec_msg->sequence >= 0) {
-			//		cout << "THere - weird, a sequence is set - lets send upwards\n";
-			//		memcpy(fillMe, buffer, BUFLEN);
-			//		return 1;
-			//	}
 
 			send(failBuffer);
 			return -1;
@@ -196,6 +191,9 @@ int Server::handshake(char * fillMe) {
 
 }
 
+/**
+ * Send a packet buffer
+ */
 void Server::send(char * buffer) {
 	if (sendto(s, buffer, BUFLEN, 0, (struct sockaddr *) &si_out, slen) == SOCKET_ERROR)
 	{
@@ -209,6 +207,10 @@ void Server::send(char * buffer) {
 }
 
 
+/** 
+ * First function called - blocks until a response comes in
+ * Performs handshake first
+ */
 Server::message * Server::getDataFromClient(char *serverBuf) {
 	char fillMe[BUFLEN];
 	int handshakeRes = handshake(fillMe);
@@ -248,6 +250,9 @@ Server::message * Server::getDataFromClient(char *serverBuf) {
 	return resmsg;
 }
 
+/**
+ * List action:  Return packet of all files on server
+ */
 void Server::list(int sequence) {
 	string output = "";
 	DIR *dir;
@@ -321,6 +326,9 @@ void Server::list(int sequence) {
 	}
 }
 
+/** 
+ * Get function:  Given a filename and a sequence number start sending file packets to client
+ */
 void Server::get(std::string filename, int sequence) {
 	int original_sequence = sequence;
 	logger.log("Server:  GET called with intial sequence of ");
@@ -388,24 +396,11 @@ void Server::get(std::string filename, int sequence) {
 			i += 1;
 		}
 		logger.log("Server:  File has been read to memory\n");
-
-		// TEST
-		//		ofstream outFile("TEST3.pdf", ios::out | ios::binary);
-		//		for (int i = 0; i < numPackets; ++i) {
-		//			cout << msgV2.at(i);
-		//			char b[BODYLEN-1];
-		//			memcpy(b, msgV2.at(i), BODYLEN-1);
-		//			outFile.write(b, BODYLEN-1);
-		//			memset(b, '/0', BODYLEN - 1);
-		//		}
-		//		outFile.close();
-		// END TEST
-
+		
 	}
 	fileToRead.close();
 
 
-	// Send 5 first packets
 
 	time_t  timev;
 	// We wait for response
@@ -437,9 +432,6 @@ void Server::get(std::string filename, int sequence) {
 		m->sequence = sequence;
 		m->numPackets = numPackets;
 		m->body[BODYLEN];
-		//		strncpy_s(m->body, data.c_str(), _TRUNCATE);
-
-		// HIPPO
 		memcpy(m->body, msgV2.at(i), BODYLEN - 1);
 
 
@@ -469,7 +461,7 @@ void Server::get(std::string filename, int sequence) {
 		FD_SET(s, &rfds);
 		retval = select(1, &rfds, NULL, NULL, &tv);
 		if (retval == -1) {
-			cout << "Goddamn error in select\n";
+			cout << "Error in select\n";
 			exit(-1);
 		}
 		if (!retval) {
@@ -631,9 +623,11 @@ void Server::get(std::string filename, int sequence) {
 	cout << "File Transfer done!\n";
 }
 
+/**
+ * Put option:  Given a filename and sequence, get ready for file packets arriving from clients
+ */
 void Server::put(string filename, int sequence) {
-	cout << "Got put for filename " << filename << " and " << sequence << "\n";
-
+	
 	char buffer[BUFLEN];
 	fd_set rfds;
 	struct timeval tv;
@@ -677,38 +671,13 @@ void Server::put(string filename, int sequence) {
 			}
 		}
 
-
-
 	}
-
-
-
-
-	//ofstream outFile(filename, ios::out | ios::binary);
-
-	//// First package is filename
-	//char resBuffer[BUFLEN];
-	//while (1) {
-	//	if ((recv_len = recvfrom(s, resBuffer, BUFLEN, 0, (struct sockaddr *) &si_in, &slen)) == SOCKET_ERROR)
-	//	{
-	//		logger.log("Server:  Error recieving data from client");
-	//		cout << "Error receiving data";
-	//		exit(EXIT_FAILURE);
-	//	}
-	//	else {
-	//		struct message *resMsg = (struct message *) resBuffer;
-	//		
-	//		outFile.write(resMsg->body, BODYLEN);
-	//		if (resMsg->finalBit == 1) {
-	//			cout << "End of file transfer\n";
-	//			logger.log("End of file transfer\n");
-	//			break;
-	//		}
-	//	}
-	//}
 
 }
 
+/**
+ * Once a PUT has been identified this function receives the packet and saves it to disk
+ */
 void Server::deliver(string filename, int sequence) {
 	vector<string> receivedPackets(0);
 	vector<char *> receivedPackets2(0);
@@ -735,8 +704,6 @@ void Server::deliver(string filename, int sequence) {
 			logger.log("\n");
 			char * buffer = reliableSend(finalBuf);
 			logger.log("Server:  Received acknowledgment from server that it received our acknowledgment\n");
-		//	logger.log("Server:  Sending empy packet to server to ensure it is back in ready mode\n");
-		//	reliableSend(buffer);
 			break;
 		}
 		if (msg->sequence < sequence) {
@@ -810,8 +777,6 @@ void Server::deliver(string filename, int sequence) {
 			logger.log("Client:  Server should now be reset\n");
 			continue;
 		}
-//		string data = msg->body;
-//		receivedPackets.at(actualSequence) = data;
 		char * newBuf = new char[BODYLEN];
 		memcpy(newBuf, msg->body, BODYLEN);
 		receivedPackets2.at(actualSequence) = newBuf;
@@ -848,34 +813,19 @@ void Server::deliver(string filename, int sequence) {
 	outFile.close();
 }
 
-int Server::validateSequence(int remoteSeq) {
-	if (remoteSeq == seq) {
-		logger.log("Server:  Sequence bits match up\n");
-		increaseSequence();
-		return 1;
-	}
-	else {
-		logger.log("Server:  Sequence bits don't match\n");
-		exit(EXIT_FAILURE);
-	}
-}
-
+/**
+ * Return random number
+ */
 int Server::getRandomNumber() {
 	srand((unsigned)time(0));
 	int randNum = (rand() % 300) + 1;
 	return randNum;
 }
 
-void Server::increaseSequence() {
-	if (seq == 1) {
-		seq = 0;
-	}
-	else {
-		seq = 1;
-	}
-}
 
-
+/**
+ *  Send packet and wait for any response, if timeout - resend
+ */
 char * Server::reliableSend(char * buffer) {
 	fd_set rfds;
 	struct timeval tv;
@@ -916,6 +866,9 @@ char * Server::reliableSend(char * buffer) {
 	return resBuffer;
 }
 
+/**
+ * Send packet to client and wait for response with same sequence - if timeout - resend
+ */
 char * Server::reliableSend(char * buffer, int sequence) {
 	fd_set rfds;
 	struct timeval tv;
