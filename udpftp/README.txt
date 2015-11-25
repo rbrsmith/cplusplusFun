@@ -6,7 +6,7 @@ Log files in log folder (both client and server use same log files)
 
 Both client and server make use of third part dirent to read files and directories on the OS
 
-Host, Port, Package size are hardcoded in the application, look for the defines in the header.
+Host, Port, Package size, Window Size, timeout are hardcoded in the application, look for the defines in the header.
 
 Data is sent using the message structure, which defines headers of ints for sequence, finalBit, errorBit etc.
 and a char buffer in the message structure called body is where the file contents is placed
